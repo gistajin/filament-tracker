@@ -1,30 +1,42 @@
 // ============================================================
-//  SHEETS.JS — Google Apps Script backend layer
+//  SHEETS.JS — Google Apps Script backend (JSONP/GET)
 // ============================================================
 
 const Sheets = {
 
-  _url() {
-    return CONFIG.scriptUrl;
-  },
+  _call(params) {
+    return new Promise((resolve, reject) => {
+      const cbName = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      const url = CONFIG.scriptUrl + '?' + Object.entries({ ...params, callback: cbName })
+        .map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');
 
-  async _post(payload) {
-    const res = await fetch(this._url(), {
-      method: 'POST',
-      body: JSON.stringify(payload)
+      const script = document.createElement('script');
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('Request timed out'));
+      }, 15000);
+
+      window[cbName] = (data) => {
+        cleanup();
+        if (data && data.status === 'error') reject(new Error(data.message));
+        else resolve(data);
+      };
+
+      function cleanup() {
+        clearTimeout(timeout);
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+      }
+
+      script.onerror = () => { cleanup(); reject(new Error('Script load failed')); };
+      script.src = url;
+      document.head.appendChild(script);
     });
-    if (!res.ok) throw new Error('Network error: ' + res.status);
-    const json = await res.json();
-    if (json.status === 'error') throw new Error(json.message);
-    return json;
   },
 
   async read(sheetName) {
-    const url = this._url() + '?tab=' + encodeURIComponent(sheetName);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Network error: ' + res.status);
-    const rows = await res.json();
-    return rows.map(r => ({
+    const rows = await this._call({ action: 'read', tab: sheetName });
+    return (Array.isArray(rows) ? rows : []).map(r => ({
       id: String(r.id || ''),
       brand: String(r.brand || ''),
       type: String(r.type || ''),
@@ -54,19 +66,19 @@ const Sheets = {
   },
 
   async append(sheetName, filament) {
-    return this._post({ action: 'append', tab: sheetName, data: filament });
+    return this._call({ action: 'append', tab: sheetName, data: JSON.stringify(filament) });
   },
 
   async update(sheetName, filament) {
-    return this._post({ action: 'update', tab: sheetName, data: filament });
+    return this._call({ action: 'update', tab: sheetName, data: JSON.stringify(filament) });
   },
 
   async delete(sheetName, id) {
-    return this._post({ action: 'delete', tab: sheetName, data: { id } });
+    return this._call({ action: 'delete', tab: sheetName, data: JSON.stringify({ id }) });
   },
 
   async ensureHeaders(sheetName) {
-    return this._post({ action: 'ensureHeaders', tab: sheetName, data: {} });
+    return this._call({ action: 'ensureHeaders', tab: sheetName, data: '{}' });
   }
 
 };
