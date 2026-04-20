@@ -42,6 +42,7 @@ const Sheets = {
       type: String(r.type || ''),
       colorname: String(r.colorname || ''),
       color: String(r.color || ''),
+      qty: String(r.qty || ''),
       weight: String(r.weight || ''),
       fullweight: String(r.fullweight || ''),
       nozzle: String(r.nozzle || ''),
