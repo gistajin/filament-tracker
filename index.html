@@ -28,6 +28,14 @@
       <button class="view-btn" data-view="all" onclick="switchView('all')">All spools</button>
     </div>
     <div class="header-right">
+      <div class="display-toggle">
+        <button class="toggle-btn active" id="btn-table" onclick="switchDisplay('table')" title="Table view">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="0" width="14" height="3" rx="1" fill="currentColor"/><rect x="0" y="5.5" width="14" height="3" rx="1" fill="currentColor"/><rect x="0" y="11" width="14" height="3" rx="1" fill="currentColor"/></svg>
+        </button>
+        <button class="toggle-btn" id="btn-gallery" onclick="switchDisplay('gallery')" title="Gallery view">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="0" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="8" y="0" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="8" y="8" width="6" height="6" rx="1.5" fill="currentColor"/></svg>
+        </button>
+      </div>
       <span id="active-user-badge"></span>
       <button class="btn-ghost" onclick="switchUser()">Switch user</button>
     </div>
@@ -35,8 +43,8 @@
 
   <main>
     <div class="toolbar">
-      <input type="text" id="search" placeholder="Search color, type, location..." oninput="renderTable()">
-      <select id="filter-type" onchange="renderTable()">
+      <input type="text" id="search" placeholder="Search color, type, location..." oninput="renderAll()">
+      <select id="filter-type" onchange="renderAll()">
         <option value="">All types</option>
         <option>PLA Basic</option>
         <option>PLA Matte</option>
@@ -62,23 +70,30 @@
 
     <div class="stats-row" id="stats-row"></div>
 
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th style="width:13%">Brand / type</th>
-            <th style="width:8%">Color</th>
-            <th style="width:13%">Color name</th>
-            <th style="width:9%">Weight</th>
-            <th style="width:12%">Print settings</th>
-            <th style="width:10%">Location</th>
-            <th style="width:8%">Cost</th>
-            <th style="width:10%">Owner</th>
-            <th style="width:17%">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
+    <div id="table-view">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:13%">Brand / type</th>
+              <th style="width:7%">Color</th>
+              <th style="width:12%">Color name</th>
+              <th style="width:7%">Qty</th>
+              <th style="width:9%">Weight</th>
+              <th style="width:11%">Print settings</th>
+              <th style="width:9%">Location</th>
+              <th style="width:7%">Cost</th>
+              <th style="width:9%">Owner</th>
+              <th style="width:16%">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="gallery-view" class="hidden">
+      <div id="gallery-grid" class="gallery-grid"></div>
     </div>
   </main>
 </div>
@@ -101,7 +116,8 @@
             <option>PLA Basic</option><option>PLA Matte</option><option>PLA Silk</option>
             <option>PLA Silk+</option><option>PLA-CF</option><option>PLA Tough+</option>
             <option>PLA Translucent</option><option>PLA Marble</option><option>PLA Glow</option>
-            <option>PLA Wood</option><option>PETG Basic</option><option>PETG HF</option><option>PETG-CF</option><option>PETG</option><option>ABS</option>
+            <option>PLA Wood</option><option>PETG Basic</option><option>PETG HF</option>
+            <option>PETG-CF</option><option>PETG</option><option>ABS</option>
             <option>TPU</option><option>ASA</option><option>Other</option>
           </select>
         </div>
@@ -112,6 +128,10 @@
         <div class="form-row">
           <label>Color</label>
           <input type="color" id="f-color" value="#cc0000">
+        </div>
+        <div class="form-row">
+          <label>Quantity (spools)</label>
+          <input type="number" id="f-qty" placeholder="1" min="0">
         </div>
         <div class="form-row">
           <label>Weight remaining (g)</label>
