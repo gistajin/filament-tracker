@@ -13,8 +13,8 @@ const CONFIG = {
   //   color:  Avatar color (any CSS hex color)
   // ----------------------------------------------------------
   users: [
-    { name: "Your Name",       sheet: "User1", color: "#5E43B7" },
-    { name: "Their Name",      sheet: "User2", color: "#0F6E56" },
+    { name: "Gisela",       sheet: "User1", color: "#0F6E56" },
+    { name: "Angie",      sheet: "User2", color: "#5E43B7" },
   ],
 
   // ----------------------------------------------------------
@@ -23,9 +23,9 @@ const CONFIG = {
 
   // Your Google Sheet ID (the long string in the URL)
   // e.g. https://docs.google.com/spreadsheets/d/THIS_PART_HERE/edit
-  sheetId: "YOUR_SHEET_ID_HERE",
+  sheetId: "1DyTiuRaB2Z34F5XGTo8fq-ilcLaP-YWriuzYCENsccg",
 
   // Your Google Sheets API key (from Google Cloud Console)
-  apiKey: "YOUR_API_KEY_HERE",
+  apiKey: "AIzaSyAgiUL1QA6HWUYIw-0iyoeorPMK3cYaUYc",
 
 };
