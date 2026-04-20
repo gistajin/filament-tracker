@@ -10,7 +10,7 @@ const CONFIG = {
   // ----------------------------------------------------------
   users: [
     { name: "Gisela",  sheet: "User1", color: "#0F6E56" },
-    { name: "Angie", sheet: "User2", color: "#5E43B7" },
+    { name: "Angie/Javier", sheet: "User2", color: "#5E43B7" },
   ],
 
   // ----------------------------------------------------------
