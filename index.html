@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Filament Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="user-select-screen" class="screen">
+  <div class="user-select-card">
+    <div class="logo-mark"></div>
+    <h1>Filament Tracker</h1>
+    <p>Who's tracking today?</p>
+    <div id="user-buttons" class="user-buttons"></div>
+  </div>
+</div>
+
+<div id="app-screen" class="screen hidden">
+  <header>
+    <div class="header-left">
+      <div class="logo-mark small"></div>
+      <span class="app-title">Filament Tracker</span>
+    </div>
+    <div class="header-center">
+      <button class="view-btn active" data-view="mine" onclick="switchView('mine')">My spools</button>
+      <button class="view-btn" data-view="all" onclick="switchView('all')">All spools</button>
+    </div>
+    <div class="header-right">
+      <span id="active-user-badge"></span>
+      <button class="btn-ghost" onclick="switchUser()">Switch user</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Search color, type, location..." oninput="renderTable()">
+      <select id="filter-type" onchange="renderTable()">
+        <option value="">All types</option>
+        <option>PLA Basic</option>
+        <option>PLA Matte</option>
+        <option>PLA Silk</option>
+        <option>PLA Silk+</option>
+        <option>PLA-CF</option>
+        <option>PLA Tough+</option>
+        <option>PLA Translucent</option>
+        <option>PLA Marble</option>
+        <option>PLA Glow</option>
+        <option>PLA Wood</option>
+        <option>PETG</option>
+        <option>ABS</option>
+        <option>TPU</option>
+        <option>ASA</option>
+        <option>Other</option>
+      </select>
+      <button class="btn-primary" id="add-btn" onclick="openModal()">+ Add spool</button>
+    </div>
+
+    <div class="stats-row" id="stats-row"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:13%">Brand / type</th>
+            <th style="width:8%">Color</th>
+            <th style="width:13%">Color name</th>
+            <th style="width:9%">Weight</th>
+            <th style="width:12%">Print settings</th>
+            <th style="width:10%">Location</th>
+            <th style="width:8%">Cost</th>
+            <th style="width:10%">Owner</th>
+            <th style="width:17%">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div id="modal-overlay" class="modal-overlay hidden" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">Add spool</h2>
+      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Brand *</label>
+          <input id="f-brand" placeholder="e.g. Bambu Lab">
+        </div>
+        <div class="form-row">
+          <label>Filament type *</label>
+          <select id="f-type">
+            <option>PLA Basic</option><option>PLA Matte</option><option>PLA Silk</option>
+            <option>PLA Silk+</option><option>PLA-CF</option><option>PLA Tough+</option>
+            <option>PLA Translucent</option><option>PLA Marble</option><option>PLA Glow</option>
+            <option>PLA Wood</option><option>PETG</option><option>ABS</option>
+            <option>TPU</option><option>ASA</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Color name</label>
+          <input id="f-colorname" placeholder="e.g. Jade White">
+        </div>
+        <div class="form-row">
+          <label>Color</label>
+          <input type="color" id="f-color" value="#cc0000">
+        </div>
+        <div class="form-row">
+          <label>Weight remaining (g)</label>
+          <input type="number" id="f-weight" placeholder="1000" min="0">
+        </div>
+        <div class="form-row">
+          <label>Full spool weight (g)</label>
+          <input type="number" id="f-fullweight" placeholder="1000" min="1">
+        </div>
+        <div class="form-row">
+          <label>Nozzle temp (°C)</label>
+          <input type="number" id="f-nozzle" placeholder="215">
+        </div>
+        <div class="form-row">
+          <label>Bed temp (°C)</label>
+          <input type="number" id="f-bed" placeholder="60">
+        </div>
+        <div class="form-row">
+          <label>Print speed (mm/s)</label>
+          <input type="number" id="f-speed" placeholder="200">
+        </div>
+        <div class="form-row">
+          <label>Storage location</label>
+          <input id="f-location" placeholder="e.g. Shelf A, Box 2">
+        </div>
+        <div class="form-row">
+          <label>Purchase date</label>
+          <input type="date" id="f-date">
+        </div>
+        <div class="form-row">
+          <label>Cost ($)</label>
+          <input type="number" id="f-cost" placeholder="12.99" step="0.01">
+        </div>
+        <div class="form-row" style="grid-column:1/-1">
+          <label>Transmission distance</label>
+          <input id="f-trans" placeholder="e.g. 2.4m bowden">
+        </div>
+        <div class="form-row" style="grid-column:1/-1">
+          <label>Notes / rating</label>
+          <textarea id="f-notes" placeholder="Print tips, rating, observations..."></textarea>
+        </div>
+      </div>
+      <div id="form-error" class="form-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" id="save-btn" onclick="saveSpool()">
+        <span id="save-label">Save spool</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="js/config.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
