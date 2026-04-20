@@ -11,7 +11,7 @@ let toastTimer = null;
 // ---- Bootstrap ----
 
 window.addEventListener('DOMContentLoaded', () => {
-  if (!CONFIG.sheetId || CONFIG.sheetId === 'YOUR_SHEET_ID_HERE') {
+  if (!CONFIG.scriptUrl || CONFIG.scriptUrl === 'YOUR_SCRIPT_URL_HERE') {
     showSetupWarning();
     return;
   }
