@@ -4,6 +4,7 @@
 
 let activeUser = null;
 let currentView = 'mine';
+let currentDisplay = 'table';
 let allFilaments = [];
 let editingId = null;
 let toastTimer = null;
@@ -26,14 +27,8 @@ function showSetupWarning() {
         <h2 style="font-size:18px;font-weight:600;margin-bottom:.5rem">Setup needed</h2>
         <p style="color:#6b6b6b;margin-bottom:1.5rem;font-size:14px;line-height:1.6">
           Open <code style="background:#f5f5f5;padding:2px 6px;border-radius:4px">js/config.js</code> and fill in your
-          <strong>sheetId</strong>, <strong>apiKey</strong>, and user names.<br><br>
-          Check the <strong>SETUP_GUIDE.md</strong> file for step-by-step instructions.
+          <strong>scriptUrl</strong> and user names.
         </p>
-        <div style="background:#f5f5f5;border-radius:8px;padding:1rem;text-align:left;font-size:12px;font-family:monospace;line-height:1.8">
-          sheetId: "1BxiMVs0..."<br>
-          apiKey: "AIzaSy..."<br>
-          users: [{name:"Your Name", sheet:"User1"}]
-        </div>
       </div>
     </div>
   `;
@@ -74,6 +69,7 @@ function switchUser() {
   activeUser = null;
   allFilaments = [];
   currentView = 'mine';
+  currentDisplay = 'table';
   document.getElementById('app-screen').classList.add('hidden');
   document.getElementById('user-select-screen').classList.remove('hidden');
   document.getElementById('search').value = '';
@@ -85,32 +81,42 @@ function switchUser() {
 async function loadData() {
   setTableLoading(true);
   try {
-    // Ensure header rows exist on first use
     await Sheets.ensureHeaders(activeUser.sheet);
-    // Load all users' data for "all" view, and active user's for "mine"
     allFilaments = await Sheets.readAll(CONFIG.users);
-    renderStats();
-    renderTable();
+    renderAll();
   } catch (e) {
     showToast('Error loading data: ' + e.message, 'error');
     setTableLoading(false);
   }
 }
 
-// ---- View switching ----
+// ---- View & display switching ----
 
 function switchView(view) {
   currentView = view;
   document.querySelectorAll('.view-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.view === view);
   });
-  const addBtn = document.getElementById('add-btn');
-  addBtn.style.display = view === 'mine' ? '' : 'none';
-  renderStats();
-  renderTable();
+  document.getElementById('add-btn').style.display = view === 'mine' ? '' : 'none';
+  renderAll();
 }
 
-// ---- Rendering ----
+function switchDisplay(display) {
+  currentDisplay = display;
+  document.getElementById('btn-table').classList.toggle('active', display === 'table');
+  document.getElementById('btn-gallery').classList.toggle('active', display === 'gallery');
+  document.getElementById('table-view').classList.toggle('hidden', display !== 'table');
+  document.getElementById('gallery-view').classList.toggle('hidden', display !== 'gallery');
+  renderAll();
+}
+
+function renderAll() {
+  renderStats();
+  if (currentDisplay === 'table') renderTable();
+  else renderGallery();
+}
+
+// ---- Filtering ----
 
 function getVisibleFilaments() {
   const q = (document.getElementById('search').value || '').toLowerCase();
@@ -124,27 +130,32 @@ function getVisibleFilaments() {
   });
 }
 
+// ---- Stats ----
+
 function renderStats() {
   const rows = getVisibleFilaments();
   const totalWeight = rows.reduce((a, f) => a + (parseFloat(f.weight) || 0), 0);
   const totalCost = rows.reduce((a, f) => a + (parseFloat(f.cost) || 0), 0);
+  const totalQty = rows.reduce((a, f) => a + (parseInt(f.qty) || 0), 0);
   const types = new Set(rows.map(f => f.type)).size;
 
   document.getElementById('stats-row').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Spools</div><div class="stat-val">${rows.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Entries</div><div class="stat-val">${rows.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Total spools</div><div class="stat-val">${totalQty}</div></div>
     <div class="stat-card"><div class="stat-label">Total weight</div><div class="stat-val">${totalWeight.toLocaleString()}g</div></div>
     <div class="stat-card"><div class="stat-label">Types</div><div class="stat-val">${types}</div></div>
     <div class="stat-card"><div class="stat-label">Total cost</div><div class="stat-val">$${totalCost.toFixed(2)}</div></div>
   `;
 }
 
+// ---- Table view ----
+
 function renderTable() {
-  renderStats();
   const rows = getVisibleFilaments();
   const tbody = document.getElementById('tbody');
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">No filaments found — ${currentView === 'mine' ? 'add your first spool!' : 'try a different search.'}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="10">No filaments found — ${currentView === 'mine' ? 'add your first spool!' : 'try a different search.'}</td></tr>`;
     return;
   }
 
@@ -154,14 +165,16 @@ function renderTable() {
     const isOwn = f._sheet === activeUser.sheet;
     const ownerUser = CONFIG.users.find(u => u.sheet === f._sheet);
     const ownerColor = ownerUser ? ownerUser.color : '#888';
+    const qty = f.qty ? parseInt(f.qty) : null;
 
     return `<tr>
       <td>
-        <span style="font-weight:500">${esc(f.brand)}</span>
+        <span style="font-weight:500;font-size:12px">${esc(f.brand)}</span>
         <br><span class="type-badge">${esc(f.type)}</span>
       </td>
       <td><span class="color-dot" style="background:${f.color || '#ccc'}"></span></td>
       <td>${esc(f.colorname)}</td>
+      <td style="font-weight:500">${qty !== null ? qty + ' spool' + (qty !== 1 ? 's' : '') : '—'}</td>
       <td>
         ${f.weight !== '' ? f.weight + 'g' : '—'}
         ${pct !== null ? `<span class="weight-bar"><span class="weight-fill" style="width:${Math.min(pct,100)}%"></span></span>` : ''}
@@ -180,9 +193,46 @@ function renderTable() {
   }).join('');
 }
 
+// ---- Gallery view ----
+
+function renderGallery() {
+  const rows = getVisibleFilaments();
+  const grid = document.getElementById('gallery-grid');
+
+  if (!rows.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:2.5rem;color:#6b6b6b;font-size:13px">No filaments found.</div>`;
+    return;
+  }
+
+  grid.innerHTML = rows.map(f => {
+    const pct = f.fullweight && f.weight !== '' ? Math.round((parseFloat(f.weight) / parseFloat(f.fullweight)) * 100) : null;
+    const isOwn = f._sheet === activeUser.sheet;
+    const ownerUser = CONFIG.users.find(u => u.sheet === f._sheet);
+    const ownerColor = ownerUser ? ownerUser.color : '#888';
+    const qty = f.qty ? parseInt(f.qty) : null;
+    const weightLabel = f.weight !== '' ? f.weight + 'g' : '';
+
+    return `<div class="gallery-card" onclick="${isOwn ? `openEdit('${f.id}')` : ''}">
+      <div class="gallery-swatch">
+        <div class="gallery-swatch-inner" style="background:${f.color || '#ccc'}"></div>
+        ${qty !== null ? `<span class="gallery-qty-badge">x${qty}</span>` : ''}
+        <span class="gallery-owner-dot" style="background:${ownerColor}"></span>
+      </div>
+      <div class="gallery-info">
+        <div class="gallery-colorname">${esc(f.colorname || '—')}</div>
+        <div class="gallery-type">${esc(f.brand)} · ${esc(f.type)}</div>
+        <div class="gallery-meta">
+          <span class="gallery-weight">${weightLabel}</span>
+        </div>
+        ${pct !== null ? `<div class="gallery-wbar"><div class="gallery-wfill" style="width:${Math.min(pct,100)}%"></div></div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function setTableLoading(loading) {
   if (loading) {
-    document.getElementById('tbody').innerHTML = `<tr class="loading-row"><td colspan="9">Loading your filaments...</td></tr>`;
+    document.getElementById('tbody').innerHTML = `<tr class="loading-row"><td colspan="10">Loading your filaments...</td></tr>`;
   }
 }
 
@@ -206,6 +256,7 @@ function openEdit(id) {
   document.getElementById('f-type').value = f.type || 'PLA Basic';
   document.getElementById('f-colorname').value = f.colorname || '';
   document.getElementById('f-color').value = f.color || '#cc0000';
+  document.getElementById('f-qty').value = f.qty || '';
   document.getElementById('f-weight').value = f.weight || '';
   document.getElementById('f-fullweight').value = f.fullweight || '';
   document.getElementById('f-nozzle').value = f.nozzle || '';
@@ -230,7 +281,7 @@ function handleOverlayClick(e) {
 }
 
 function clearForm() {
-  ['brand','colorname','weight','fullweight','nozzle','bed','speed','location','date','cost','trans','notes'].forEach(k => {
+  ['brand','colorname','qty','weight','fullweight','nozzle','bed','speed','location','date','cost','trans','notes'].forEach(k => {
     document.getElementById('f-' + k).value = '';
   });
   document.getElementById('f-type').value = 'PLA Basic';
@@ -255,6 +306,7 @@ async function saveSpool() {
     type: document.getElementById('f-type').value,
     colorname: document.getElementById('f-colorname').value.trim(),
     color: document.getElementById('f-color').value,
+    qty: document.getElementById('f-qty').value,
     weight: document.getElementById('f-weight').value,
     fullweight: document.getElementById('f-fullweight').value || '1000',
     nozzle: document.getElementById('f-nozzle').value,
@@ -283,7 +335,7 @@ async function saveSpool() {
       showToast('Spool added!', 'success');
     }
     closeModal();
-    renderTable();
+    renderAll();
   } catch (e) {
     const err = document.getElementById('form-error');
     err.textContent = 'Save failed: ' + e.message;
@@ -299,7 +351,7 @@ async function deleteSpool(id) {
   try {
     await Sheets.delete(activeUser.sheet, id);
     allFilaments = allFilaments.filter(f => f.id !== id);
-    renderTable();
+    renderAll();
     showToast('Spool deleted.', 'success');
   } catch (e) {
     showToast('Delete failed: ' + e.message, 'error');
