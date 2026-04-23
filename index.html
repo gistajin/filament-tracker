@@ -26,6 +26,7 @@
     <div class="header-center">
       <button class="view-btn active" data-view="mine" onclick="switchView('mine')">My spools</button>
       <button class="view-btn" data-view="all" onclick="switchView('all')">All spools</button>
+      <button class="view-btn" data-view="estimator" onclick="switchView('estimator')">Estimator</button>
     </div>
     <div class="header-right">
       <div class="display-toggle">
@@ -46,32 +47,15 @@
       <input type="text" id="search" placeholder="Search color, type, location..." oninput="renderAll()">
       <select id="filter-type" onchange="renderAll()">
         <option value="">All types</option>
-        <option>PLA Basic</option>
-        <option>PLA Basic Gradient</option>
-        <option>PLA Matte</option>
-        <option>PLA Silk</option>
-        <option>PLA Silk+</option>
-        <option>PLA Silk Multi-Color</option>
-        <option>PLA-CF</option>
-        <option>PLA Tough+</option>
-        <option>PLA Translucent</option>
-        <option>PLA Metal</option>
-        <option>PLA Marble</option>
-        <option>PLA Galaxy</option>
-        <option>PLA Sparkle</option>
-        <option>PLA Glow</option>
-        <option>PLA Wood</option>
-        <option>PETG Basic</option>
-        <option>PETG HF</option>
-        <option>PETG-CF</option>
-        <option>PETG</option>
-        <option>ABS</option>
-        <option>TPU 95A HF</option>
-        <option>TPU 90A</option>
-        <option>TPU 85A</option>
-        <option>TPU</option>
-        <option>ASA</option>
-        <option>Other</option>
+        <option>PLA Basic</option><option>PLA Basic Gradient</option><option>PLA Matte</option>
+        <option>PLA Silk</option><option>PLA Silk+</option><option>PLA Silk Multi-Color</option>
+        <option>PLA-CF</option><option>PLA Tough+</option><option>PLA Translucent</option>
+        <option>PLA Metal</option><option>PLA Marble</option><option>PLA Galaxy</option>
+        <option>PLA Sparkle</option><option>PLA Glow</option><option>PLA Wood</option>
+        <option>PETG Basic</option><option>PETG HF</option><option>PETG-CF</option>
+        <option>PETG</option><option>ABS</option>
+        <option>TPU 95A HF</option><option>TPU 90A</option><option>TPU 85A</option><option>TPU</option>
+        <option>ASA</option><option>Other</option>
       </select>
       <select id="filter-brand" onchange="renderAll()">
         <option value="">All brands</option>
@@ -106,6 +90,51 @@
     <div id="gallery-view" class="hidden">
       <div id="gallery-grid" class="gallery-grid"></div>
     </div>
+
+    <div id="estimator-view" class="hidden">
+      <div class="estimator-layout">
+
+        <div class="estimator-form">
+          <div class="est-card">
+            <div class="est-card-title">Print details</div>
+
+            <div class="est-field">
+              <label>Print time (hours)</label>
+              <input type="number" id="est-hours" placeholder="0.0" min="0" step="0.5"
+                oninput="calculateEstimate()" onchange="calculateEstimate()">
+            </div>
+
+            <div class="est-field">
+              <label>Filaments used</label>
+              <div id="est-filaments-list"></div>
+              <button class="btn-ghost" style="margin-top:6px;font-size:12px;width:100%" onclick="addEstFilament()">+ Add filament</button>
+            </div>
+          </div>
+
+          <div class="est-card">
+            <div class="est-card-title">Current rates <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(from Settings sheet)</span></div>
+            <div class="est-rates-grid">
+              <div class="est-rate-row"><span>Labor</span><span id="est-labor-rate">—</span><span>/hr</span></div>
+              <div class="est-rate-row"><span>Machine</span><span id="est-machine-rate">—</span><span>/hr</span></div>
+              <div class="est-rate-row"><span>Electricity</span><span id="est-electricity-rate">—</span><span>/hr</span></div>
+              <div class="est-rate-row"><span>Tax</span><span id="est-tax-rate">—</span><span></span></div>
+              <div class="est-rate-row"><span>Profit margin</span><span id="est-profit-margin">—</span><span></span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="estimator-result">
+          <div class="est-card">
+            <div class="est-card-title">Cost breakdown</div>
+            <div id="est-breakdown" class="est-breakdown">
+              <div style="color:#aaa;font-size:13px;padding:1rem 0">Fill in print details to see the estimate.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -117,10 +146,7 @@
     </div>
     <div class="modal-body">
       <div class="form-grid">
-        <div class="form-row">
-          <label>Brand *</label>
-          <input id="f-brand" placeholder="e.g. Bambu Lab">
-        </div>
+        <div class="form-row"><label>Brand *</label><input id="f-brand" placeholder="e.g. Bambu Lab"></div>
         <div class="form-row">
           <label>Filament type *</label>
           <select id="f-type">
@@ -130,71 +156,30 @@
             <option>PLA Metal</option><option>PLA Marble</option><option>PLA Galaxy</option>
             <option>PLA Sparkle</option><option>PLA Glow</option><option>PLA Wood</option>
             <option>PETG Basic</option><option>PETG HF</option><option>PETG-CF</option>
-            <option>PETG</option><option>ABS</option><option>TPU 95A HF</option>
-            <option>TPU 90A</option><option>TPU 85A</option><option>TPU</option>
+            <option>PETG</option><option>ABS</option>
+            <option>TPU 95A HF</option><option>TPU 90A</option><option>TPU 85A</option><option>TPU</option>
             <option>ASA</option><option>Other</option>
           </select>
         </div>
-        <div class="form-row">
-          <label>Color name</label>
-          <input id="f-colorname" placeholder="e.g. Jade White">
-        </div>
-        <div class="form-row">
-          <label>Color</label>
-          <input type="color" id="f-color" value="#cc0000">
-        </div>
-        <div class="form-row">
-          <label>Quantity</label>
-          <input type="number" id="f-qty" placeholder="1" min="0">
-        </div>
-        <div class="form-row">
-          <label>Weight remaining (g)</label>
-          <input type="number" id="f-weight" placeholder="1000" min="0">
-        </div>
-        <div class="form-row">
-          <label>Full spool weight (g)</label>
-          <input type="number" id="f-fullweight" placeholder="1000" min="1">
-        </div>
-        <div class="form-row">
-          <label>Nozzle temp (°C)</label>
-          <input type="number" id="f-nozzle" placeholder="215">
-        </div>
-        <div class="form-row">
-          <label>Bed temp (°C)</label>
-          <input type="number" id="f-bed" placeholder="60">
-        </div>
-        <div class="form-row">
-          <label>Print speed (mm/s)</label>
-          <input type="number" id="f-speed" placeholder="200">
-        </div>
-        <div class="form-row">
-          <label>Storage location</label>
-          <input id="f-location" placeholder="e.g. Shelf A, Box 2">
-        </div>
-        <div class="form-row">
-          <label>Purchase date</label>
-          <input type="date" id="f-date">
-        </div>
-        <div class="form-row">
-          <label>Cost ($)</label>
-          <input type="number" id="f-cost" placeholder="12.99" step="0.01">
-        </div>
-        <div class="form-row" style="grid-column:1/-1">
-          <label>Transmission distance</label>
-          <input id="f-trans" placeholder="e.g. 2.4m bowden">
-        </div>
-        <div class="form-row" style="grid-column:1/-1">
-          <label>Notes / rating</label>
-          <textarea id="f-notes" placeholder="Print tips, rating, observations..."></textarea>
-        </div>
+        <div class="form-row"><label>Color name</label><input id="f-colorname" placeholder="e.g. Jade White"></div>
+        <div class="form-row"><label>Color</label><input type="color" id="f-color" value="#cc0000"></div>
+        <div class="form-row"><label>Quantity</label><input type="number" id="f-qty" placeholder="1" min="0"></div>
+        <div class="form-row"><label>Weight remaining (g)</label><input type="number" id="f-weight" placeholder="1000" min="0"></div>
+        <div class="form-row"><label>Full spool weight (g)</label><input type="number" id="f-fullweight" placeholder="1000" min="1"></div>
+        <div class="form-row"><label>Nozzle temp (°C)</label><input type="number" id="f-nozzle" placeholder="215"></div>
+        <div class="form-row"><label>Bed temp (°C)</label><input type="number" id="f-bed" placeholder="60"></div>
+        <div class="form-row"><label>Print speed (mm/s)</label><input type="number" id="f-speed" placeholder="200"></div>
+        <div class="form-row"><label>Storage location</label><input id="f-location" placeholder="e.g. Shelf A"></div>
+        <div class="form-row"><label>Purchase date</label><input type="date" id="f-date"></div>
+        <div class="form-row"><label>Cost ($)</label><input type="number" id="f-cost" placeholder="12.99" step="0.01"></div>
+        <div class="form-row" style="grid-column:1/-1"><label>Transmission distance</label><input id="f-trans" placeholder="e.g. 2.4m bowden"></div>
+        <div class="form-row" style="grid-column:1/-1"><label>Notes / rating</label><textarea id="f-notes" placeholder="Print tips, rating..."></textarea></div>
       </div>
       <div id="form-error" class="form-error hidden"></div>
     </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn-primary" id="save-btn" onclick="saveSpool()">
-        <span id="save-label">Save spool</span>
-      </button>
+      <button class="btn-primary" id="save-btn" onclick="saveSpool()"><span id="save-label">Save spool</span></button>
     </div>
   </div>
 </div>
