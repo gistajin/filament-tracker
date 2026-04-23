@@ -303,7 +303,7 @@ function calculateEstimate() {
   const laborCost = hours * laborRate;
   const machineCost = hours * machineRate;
   const electricityCost = hours * electricityRate;
-  const subtotal = (filamentCost + laborCost + machineCost + electricityCost) * qty;
+  const subtotal = (filamentCost * qty) + laborCost + machineCost + electricityCost;
   const profit = subtotal * (profitMargin / 100);
   const beforeTax = subtotal + profit;
   const tax = beforeTax * (taxRate / 100);
