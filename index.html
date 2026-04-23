@@ -110,6 +110,12 @@
             </div>
 
             <div class="est-field">
+              <label>Quantity</label>
+              <input type="number" id="est-qty" placeholder="1" min="1" value="1"
+                oninput="calculateEstimate()" onchange="calculateEstimate()">
+            </div>
+
+            <div class="est-field">
               <label>Filaments used</label>
               <div id="est-filaments-list"></div>
               <button class="btn-ghost" style="margin-top:6px;font-size:12px;width:100%" onclick="addEstFilament()">+ Add filament</button>
