@@ -111,9 +111,18 @@ function switchDisplay(display) {
 }
 
 function renderAll() {
+  populateBrandFilter();
   renderStats();
   if (currentDisplay === 'table') renderTable();
   else renderGallery();
+}
+
+function populateBrandFilter() {
+  const select = document.getElementById('filter-brand');
+  const current = select.value;
+  const brands = [...new Set(allFilaments.map(f => f.brand).filter(Boolean))].sort();
+  select.innerHTML = '<option value="">All brands</option>' +
+    brands.map(b => `<option${b === current ? ' selected' : ''}>${b}</option>`).join('');
 }
 
 // ---- Filtering ----
@@ -121,12 +130,13 @@ function renderAll() {
 function getVisibleFilaments() {
   const q = (document.getElementById('search').value || '').toLowerCase();
   const typeFilter = document.getElementById('filter-type').value;
+  const brandFilter = document.getElementById('filter-brand').value;
   const base = currentView === 'mine'
     ? allFilaments.filter(f => f._sheet === activeUser.sheet)
     : allFilaments;
   return base.filter(f => {
     const txt = [f.brand, f.type, f.colorname, f.location, f.notes, f._owner].join(' ').toLowerCase();
-    return txt.includes(q) && (!typeFilter || f.type === typeFilter);
+    return txt.includes(q) && (!typeFilter || f.type === typeFilter) && (!brandFilter || f.brand === brandFilter);
   });
 }
 
