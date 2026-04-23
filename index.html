@@ -120,6 +120,11 @@
               <div id="est-filaments-list"></div>
               <button class="btn-ghost" style="margin-top:6px;font-size:12px;width:100%" onclick="addEstFilament()">+ Add filament</button>
             </div>
+            <div class="est-field">
+              <label>Discount (%)</label>
+              <input type="number" id="est-discount" placeholder="e.g. 10" min="0" max="100" step="1"
+                oninput="calculateEstimate()" onchange="calculateEstimate()">
+            </div>
           </div>
 
           <div class="est-card">
