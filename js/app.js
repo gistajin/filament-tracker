@@ -307,7 +307,9 @@ function calculateEstimate() {
   const profit = subtotal * (profitMargin / 100);
   const beforeTax = subtotal + profit;
   const tax = beforeTax * (taxRate / 100);
-  const total = beforeTax + tax;
+  const discount = parseFloat(document.getElementById('est-discount').value) || 0;
+  const discountAmount = (beforeTax + tax) * (discount / 100);
+  const total = beforeTax + tax - discountAmount;
 
   const fmt = n => '$' + n.toFixed(2);
 
@@ -331,6 +333,7 @@ function calculateEstimate() {
     <div class="est-breakdown-row"><span>Profit (${profitMargin}%)</span><span>${fmt(profit)}</span></div>
     <div class="est-breakdown-row"><span>Tax (${taxRate}%)</span><span>${fmt(tax)}</span></div>
     <div class="est-divider"></div>
+    ${discount > 0 ? `<div class="est-breakdown-row" style="color:#1D9E75"><span>Discount (${discount}%)</span><span>-${fmt(discountAmount)}</span></div>` : ''}
     <div class="est-total-row"><span>Total price</span><span>${fmt(total)}</span></div>
   `;
 }
