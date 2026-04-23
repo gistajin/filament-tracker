@@ -279,6 +279,7 @@ function updateEstFilament(i, key, val) {
 
 function calculateEstimate() {
   const hours = parseFloat(document.getElementById('est-hours').value) || 0;
+  const qty = parseInt(document.getElementById('est-qty').value) || 1;
   const s = appSettings;
   const laborRate = parseFloat(s.labor_rate) || 0;
   const machineRate = parseFloat(s.machine_rate) || 0;
@@ -302,7 +303,7 @@ function calculateEstimate() {
   const laborCost = hours * laborRate;
   const machineCost = hours * machineRate;
   const electricityCost = hours * electricityRate;
-  const subtotal = filamentCost + laborCost + machineCost + electricityCost;
+  const subtotal = (filamentCost + laborCost + machineCost + electricityCost) * qty;
   const profit = subtotal * (profitMargin / 100);
   const beforeTax = subtotal + profit;
   const tax = beforeTax * (taxRate / 100);
@@ -321,7 +322,7 @@ function calculateEstimate() {
   document.getElementById('est-breakdown').innerHTML = `
     <div class="est-section-label">Filament</div>
     ${filamentRows}
-    <div class="est-section-label" style="margin-top:10px">Time (${hours.toFixed(1)} hrs)</div>
+    <div class="est-section-label">Time (${hours.toFixed(1)} hrs × ${qty} print${qty !== 1 ? 's' : ''})</div>
     <div class="est-breakdown-row"><span>Labor @ ${fmt(laborRate)}/hr</span><span>${fmt(laborCost)}</span></div>
     <div class="est-breakdown-row"><span>Machine @ ${fmt(machineRate)}/hr</span><span>${fmt(machineCost)}</span></div>
     <div class="est-breakdown-row"><span>Electricity @ ${fmt(electricityRate)}/hr</span><span>${fmt(electricityCost)}</span></div>
