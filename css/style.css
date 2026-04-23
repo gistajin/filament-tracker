@@ -689,3 +689,115 @@ tr:hover td { background: #fafaf9; }
   border-radius: 2px;
   background: #1D9E75;
 }
+
+/* ---- Estimator ---- */
+.estimator-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 700px) {
+  .estimator-layout { grid-template-columns: 1fr; }
+}
+
+.est-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  margin-bottom: 14px;
+}
+
+.est-card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+
+.est-field {
+  margin-bottom: 1rem;
+}
+
+.est-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+}
+
+.est-field input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-med);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+}
+
+.est-field input:focus { border-color: var(--accent); }
+
+.est-rates-grid { display: flex; flex-direction: column; gap: 6px; }
+
+.est-rate-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  padding: 4px 0;
+  border-bottom: 0.5px solid var(--border);
+  color: var(--text);
+}
+
+.est-rate-row:last-child { border-bottom: none; }
+.est-rate-row span:nth-child(2) { font-weight: 500; }
+.est-rate-row span:nth-child(3) { color: var(--text-muted); font-size: 11px; }
+
+.est-breakdown { font-size: 13px; }
+
+.est-section-label {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  margin-top: 2px;
+}
+
+.est-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 0.5px solid var(--border);
+  color: var(--text);
+}
+
+.est-breakdown-row:last-child { border-bottom: none; }
+
+.est-divider {
+  height: 0.5px;
+  background: var(--border-med);
+  margin: 8px 0;
+}
+
+.est-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0 2px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.est-filament-row select { min-width: 0; }
