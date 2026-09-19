@@ -500,6 +500,30 @@ tr:hover td { background: #fafaf9; }
   color: var(--text-muted);
 }
 
+.fair-stock-hint {
+  font-size: 10px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.fair-color-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.fair-color-row input[type=color] {
+  width: 34px;
+  height: 34px;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.fair-color-row input[type=text] { flex: 1; font-size: 12px; }
+.fair-color-row input[type=number] { width: 70px; font-size: 12px; }
+.fair-color-row .btn-delete { padding: 4px 8px; font-size: 11px; }
+
 .form-row input[type=color] {
   padding: 2px 4px;
   height: 36px;
@@ -890,6 +914,33 @@ tr:hover td { background: #fafaf9; }
 
 .fair-license-badge.inline {
   position: static;
+  display: inline-block;
+}
+
+/* ---- Fair color breakdown chips ---- */
+.fair-color-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.fair-color-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: #f0efe9;
+  color: var(--text-muted);
+}
+
+.fair-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.15);
   display: inline-block;
 }
 
