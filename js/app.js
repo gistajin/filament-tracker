@@ -724,10 +724,38 @@ function removeFairPhoto() { fairPhotoData = ''; updateFairPhotoPreview(); }
 
 // ---- Fair color breakdown (per-item colors & quantities) ----
 
+function fairFilamentOptions() {
+  const seen = new Set();
+  const options = [];
+  allFilaments.forEach(f => {
+    const key = `${f.brand}|${f.type}|${f.colorname}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const label = [f.brand, f.type, f.colorname].filter(Boolean).join(' — ');
+    options.push({ id: f.id, label, hex: f.color, name: [f.type, f.colorname].filter(Boolean).join(' ') });
+  });
+  return options;
+}
+
+function applyFairColorFilament(i, filamentId) {
+  if (!filamentId) return; // "Custom color..." — leave fields as-is
+  const opt = fairFilamentOptions().find(o => o.id === filamentId);
+  if (!opt) return;
+  fairColorRows[i].hex = opt.hex || fairColorRows[i].hex;
+  fairColorRows[i].name = opt.name;
+  renderFairColorRows();
+}
+
 function renderFairColorRows() {
   const container = document.getElementById('ff-colors-list');
+  const filamentOptions = fairFilamentOptions();
+  const optionsHtml = filamentOptions.map(o => `<option value="${o.id}">${esc(o.label)}</option>`).join('');
   container.innerHTML = fairColorRows.map((c, i) => `
     <div class="fair-color-row">
+      <select class="fair-color-filament-select" onchange="applyFairColorFilament(${i},this.value)">
+        <option value="">Custom color...</option>
+        ${optionsHtml}
+      </select>
       <input type="color" value="${c.hex || '#cc0000'}" onchange="updateFairColorRow(${i},'hex',this.value)">
       <input type="text" placeholder="Color name" value="${esc(c.name || '')}" oninput="updateFairColorRow(${i},'name',this.value)">
       <input type="number" placeholder="Qty" min="0" value="${c.qty || ''}" oninput="updateFairColorRow(${i},'qty',this.value)">
