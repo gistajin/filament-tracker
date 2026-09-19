@@ -13,6 +13,7 @@ let estimatorFilaments = [];
 let fairItems = [];
 let fairLoaded = false;
 let fairDisplay = 'grid';
+let fairGroupFilter = null;
 let editingFairId = null;
 let fairPhotoData = '';
 
@@ -114,6 +115,7 @@ function switchView(view) {
   if (isEstimator) {
     renderEstimator();
   } else if (isFair) {
+    fairGroupFilter = null;
     if (fairLoaded) renderFair(); else loadFairData();
   } else {
     renderAll();
@@ -383,37 +385,86 @@ function setFairLoading() {
 
 function getVisibleFairItems() {
   const q = (document.getElementById('search').value || '').toLowerCase();
-  return fairItems.filter(f => (f.model + ' ' + f.license).toLowerCase().includes(q));
+  let items = fairItems;
+  if (fairGroupFilter !== null) {
+    items = items.filter(f => (f.model || '').trim() === fairGroupFilter);
+  }
+  return items.filter(f => (f.model + ' ' + f.variant + ' ' + f.license).toLowerCase().includes(q));
+}
+
+// Groups items sharing the same (trimmed) model name — used to collapse
+// multi-variant models (e.g. many keychain colors) into one card/row.
+function groupFairItems(items) {
+  const map = new Map();
+  items.forEach(f => {
+    const key = (f.model || '').trim();
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(f);
+  });
+  return [...map.entries()].map(([model, groupItems]) => ({ model, items: groupItems }));
+}
+
+function openFairGroup(model) {
+  fairGroupFilter = model;
+  document.getElementById('search').value = '';
+  renderFair();
+}
+
+function closeFairGroup() {
+  fairGroupFilter = null;
+  renderFair();
 }
 
 function renderFair() {
-  renderFairStats();
+  renderFairBreadcrumb();
+  if (fairGroupFilter === null) renderFairStats();
   if (fairDisplay === 'list') renderFairList();
   else renderFairGrid();
 }
 
-function renderFairGrid() {
-  const rows = getVisibleFairItems();
-  const grid = document.getElementById('fair-grid');
-  if (!rows.length) {
-    grid.innerHTML = `<div class="fair-empty">No models yet — add your first one to sell at the fair!</div>`;
+function renderFairBreadcrumb() {
+  const bar = document.getElementById('fair-breadcrumb');
+  const statsRow = document.getElementById('fair-stats-row');
+  const addBtn = document.getElementById('add-fair-btn');
+  if (fairGroupFilter === null) {
+    bar.classList.add('hidden');
+    statsRow.classList.remove('hidden');
+    addBtn.textContent = '+ Add model';
     return;
   }
-  grid.innerHTML = rows.map(f => {
-    const printed = parseInt(f.printed) || 0;
-    const toSell = parseInt(f.toSell) || 0;
-    const sold = parseInt(f.sold) || 0;
-    const remaining = Math.max(toSell - sold, 0);
-    const price = parseFloat(f.price) || 0;
-    const pct = toSell > 0 ? Math.min(Math.round((sold / toSell) * 100), 100) : 0;
-    const hasLicense = f.licenseStatus === 'have';
-    return `<div class="fair-card">
+  statsRow.classList.add('hidden');
+  bar.classList.remove('hidden');
+  addBtn.textContent = '+ Add variant';
+  const items = fairItems.filter(f => (f.model || '').trim() === fairGroupFilter);
+  const totalPrinted = items.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
+  const totalSold = items.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
+  document.getElementById('fair-breadcrumb-title').innerHTML =
+    `<strong>${esc(fairGroupFilter)}</strong><span class="fair-breadcrumb-meta">${items.length} variant${items.length !== 1 ? 's' : ''} &middot; ${totalPrinted} in stock &middot; ${totalSold} sold</span>`;
+}
+
+function fairPriceLabel(items) {
+  const prices = [...new Set(items.map(f => parseFloat(f.price) || 0).filter(p => p > 0))];
+  if (!prices.length) return '—';
+  if (prices.length === 1) return '$' + prices[0].toFixed(2);
+  return '$' + Math.min(...prices).toFixed(2) + '–$' + Math.max(...prices).toFixed(2);
+}
+
+function fairCardHtml(f, isVariant) {
+  const printed = parseInt(f.printed) || 0;
+  const toSell = parseInt(f.toSell) || 0;
+  const sold = parseInt(f.sold) || 0;
+  const remaining = Math.max(toSell - sold, 0);
+  const price = parseFloat(f.price) || 0;
+  const pct = toSell > 0 ? Math.min(Math.round((sold / toSell) * 100), 100) : 0;
+  const hasLicense = f.licenseStatus === 'have';
+  const title = isVariant ? (f.variant || f.model) : f.model;
+  return `<div class="fair-card">
       <div class="fair-card-photo">
         ${f.photo ? `<img src="${f.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
         <span class="fair-license-badge ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need license'}</span>
       </div>
       <div class="fair-card-body">
-        <div class="fair-card-title">${esc(f.model)}</div>
+        <div class="fair-card-title">${esc(title)}</div>
         ${f.license ? `<div class="fair-card-license" title="${esc(f.license)}">${esc(f.license)}</div>` : ''}
         <div class="fair-card-row"><span>Stock</span><span>${printed}</span></div>
         <div class="fair-card-row"><span>Price</span><span>${price ? '$' + price.toFixed(2) : '—'}</span></div>
@@ -432,26 +483,63 @@ function renderFairGrid() {
         </div>
       </div>
     </div>`;
-  }).join('');
 }
 
-function renderFairList() {
+function fairGroupCardHtml(g) {
+  const items = g.items;
+  const photoItem = items.find(f => f.photo);
+  const totalPrinted = items.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
+  const totalToSell = items.reduce((a, f) => a + (parseInt(f.toSell) || 0), 0);
+  const totalSold = items.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
+  const remaining = Math.max(totalToSell - totalSold, 0);
+  const pct = totalToSell > 0 ? Math.min(Math.round((totalSold / totalToSell) * 100), 100) : 0;
+  const allHave = items.every(f => f.licenseStatus === 'have');
+  const anyHave = items.some(f => f.licenseStatus === 'have');
+  const badgeClass = allHave ? 'has' : (anyHave ? 'mixed' : 'need');
+  const badgeText = allHave ? 'Licensed' : (anyHave ? 'Mixed' : 'Need license');
+  return `<div class="fair-card fair-group-card" onclick="openFairGroup('${esc(g.model).replace(/'/g, "\\'")}')">
+      <div class="fair-card-photo">
+        ${photoItem ? `<img src="${photoItem.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
+        <span class="fair-license-badge ${badgeClass}">${badgeText}</span>
+        <span class="fair-variant-count">${items.length} variants</span>
+      </div>
+      <div class="fair-card-body">
+        <div class="fair-card-title">${esc(g.model)}</div>
+        <div class="fair-card-row"><span>Stock</span><span>${totalPrinted}</span></div>
+        <div class="fair-card-row"><span>Price</span><span>${fairPriceLabel(items)}</span></div>
+        <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${totalToSell}</span></div>
+        <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
+        <div class="fair-group-hint">Click to view variants &rarr;</div>
+      </div>
+    </div>`;
+}
+
+function renderFairGrid() {
   const rows = getVisibleFairItems();
-  const tbody = document.getElementById('fair-tbody');
+  const grid = document.getElementById('fair-grid');
   if (!rows.length) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">No models yet — add your first one to sell at the fair!</td></tr>`;
+    grid.innerHTML = `<div class="fair-empty">${fairGroupFilter !== null ? 'No variants yet — add the first one!' : 'No models yet — add your first one to sell at the fair!'}</div>`;
     return;
   }
-  tbody.innerHTML = rows.map(f => {
-    const printed = parseInt(f.printed) || 0;
-    const toSell = parseInt(f.toSell) || 0;
-    const sold = parseInt(f.sold) || 0;
-    const remaining = Math.max(toSell - sold, 0);
-    const price = parseFloat(f.price) || 0;
-    const hasLicense = f.licenseStatus === 'have';
-    return `<tr>
+  if (fairGroupFilter !== null) {
+    grid.innerHTML = rows.map(f => fairCardHtml(f, true)).join('');
+  } else {
+    const groups = groupFairItems(rows);
+    grid.innerHTML = groups.map(g => g.items.length > 1 ? fairGroupCardHtml(g) : fairCardHtml(g.items[0], false)).join('');
+  }
+}
+
+function fairRowHtml(f, isVariant) {
+  const printed = parseInt(f.printed) || 0;
+  const toSell = parseInt(f.toSell) || 0;
+  const sold = parseInt(f.sold) || 0;
+  const remaining = Math.max(toSell - sold, 0);
+  const price = parseFloat(f.price) || 0;
+  const hasLicense = f.licenseStatus === 'have';
+  const title = isVariant ? (f.variant || f.model) : f.model;
+  return `<tr>
       <td>${f.photo ? `<img src="${f.photo}" class="fair-thumb" alt="">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
-      <td><span style="font-weight:500">${esc(f.model)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}</td>
+      <td><span style="font-weight:500">${esc(title)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}</td>
       <td><span class="fair-license-badge inline ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need'}</span></td>
       <td>${printed}</td>
       <td>${toSell}</td>
@@ -471,12 +559,50 @@ function renderFairList() {
         <button class="btn-delete" onclick="deleteFairItem('${f.id}')">Delete</button>
       </div></td>
     </tr>`;
-  }).join('');
+}
+
+function fairGroupRowHtml(g) {
+  const items = g.items;
+  const photoItem = items.find(f => f.photo);
+  const totalPrinted = items.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
+  const totalToSell = items.reduce((a, f) => a + (parseInt(f.toSell) || 0), 0);
+  const totalSold = items.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
+  const remaining = Math.max(totalToSell - totalSold, 0);
+  const allHave = items.every(f => f.licenseStatus === 'have');
+  const anyHave = items.some(f => f.licenseStatus === 'have');
+  const badgeClass = allHave ? 'has' : (anyHave ? 'mixed' : 'need');
+  const badgeText = allHave ? 'Licensed' : (anyHave ? 'Mixed' : 'Need');
+  return `<tr class="fair-group-row" onclick="openFairGroup('${esc(g.model).replace(/'/g, "\\'")}')">
+      <td>${photoItem ? `<img src="${photoItem.photo}" class="fair-thumb" alt="">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
+      <td><span style="font-weight:500">${esc(g.model)}</span><span class="fair-list-note">${items.length} variants</span></td>
+      <td><span class="fair-license-badge inline ${badgeClass}">${badgeText}</span></td>
+      <td>${totalPrinted}</td>
+      <td>${totalToSell}</td>
+      <td>${totalSold}</td>
+      <td>${remaining}</td>
+      <td>${fairPriceLabel(items)}</td>
+      <td><span style="font-size:11px;color:var(--text-muted)">View &rarr;</span></td>
+    </tr>`;
+}
+
+function renderFairList() {
+  const rows = getVisibleFairItems();
+  const tbody = document.getElementById('fair-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${fairGroupFilter !== null ? 'No variants yet — add the first one!' : 'No models yet — add your first one to sell at the fair!'}</td></tr>`;
+    return;
+  }
+  if (fairGroupFilter !== null) {
+    tbody.innerHTML = rows.map(f => fairRowHtml(f, true)).join('');
+  } else {
+    const groups = groupFairItems(rows);
+    tbody.innerHTML = groups.map(g => g.items.length > 1 ? fairGroupRowHtml(g) : fairRowHtml(g.items[0], false)).join('');
+  }
 }
 
 function renderFairStats() {
   const rows = fairItems;
-  const totalModels = rows.length;
+  const totalModels = groupFairItems(rows).length;
   const totalPrinted = rows.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
   const totalToSell = rows.reduce((a, f) => a + (parseInt(f.toSell) || 0), 0);
   const totalSold = rows.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
@@ -514,9 +640,18 @@ async function bumpFairSold(id, delta) {
 function openFairModal() {
   editingFairId = null;
   fairPhotoData = '';
-  document.getElementById('fair-modal-title').textContent = 'Add model';
-  document.getElementById('fair-save-label').textContent = 'Save model';
   clearFairForm();
+  const modelInput = document.getElementById('ff-model');
+  if (fairGroupFilter !== null) {
+    document.getElementById('fair-modal-title').textContent = 'Add variant';
+    document.getElementById('fair-save-label').textContent = 'Save variant';
+    modelInput.value = fairGroupFilter;
+    modelInput.readOnly = true;
+  } else {
+    document.getElementById('fair-modal-title').textContent = 'Add model';
+    document.getElementById('fair-save-label').textContent = 'Save model';
+    modelInput.readOnly = false;
+  }
   document.getElementById('fair-modal-overlay').classList.remove('hidden');
 }
 
@@ -526,7 +661,10 @@ function openFairEdit(id) {
   fairPhotoData = f.photo || '';
   document.getElementById('fair-modal-title').textContent = 'Edit model';
   document.getElementById('fair-save-label').textContent = 'Save changes';
-  document.getElementById('ff-model').value = f.model || '';
+  const modelInput = document.getElementById('ff-model');
+  modelInput.value = f.model || '';
+  modelInput.readOnly = false;
+  document.getElementById('ff-variant').value = f.variant || '';
   document.getElementById('ff-license-status').value = f.licenseStatus || 'need';
   document.getElementById('ff-price').value = f.price || '';
   document.getElementById('ff-license').value = f.license || '';
@@ -542,7 +680,7 @@ function closeFairModal() { document.getElementById('fair-modal-overlay').classL
 function handleFairOverlayClick(e) { if (e.target === document.getElementById('fair-modal-overlay')) closeFairModal(); }
 
 function clearFairForm() {
-  ['model', 'license', 'printed', 'tosell', 'sold', 'price'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
+  ['model', 'variant', 'license', 'printed', 'tosell', 'sold', 'price'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
   document.getElementById('ff-license-status').value = 'need';
   document.getElementById('ff-sold').value = '0';
   document.getElementById('fair-form-error').classList.add('hidden');
@@ -609,6 +747,7 @@ async function saveFairItem() {
   }
   const payload = {
     model,
+    variant: document.getElementById('ff-variant').value.trim(),
     license: document.getElementById('ff-license').value.trim(),
     licenseStatus: document.getElementById('ff-license-status').value,
     printed: document.getElementById('ff-printed').value,
