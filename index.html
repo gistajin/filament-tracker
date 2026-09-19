@@ -71,7 +71,7 @@
         </button>
       </div>
       <select id="event-select" class="hidden" onchange="selectEvent(this.value)"></select>
-      <button class="btn-ghost hidden" id="rename-event-btn" onclick="openRenameEventModal()">Rename</button>
+      <button class="btn-ghost hidden" id="rename-event-btn" onclick="openRenameEventModal()">Edit</button>
       <button class="btn-ghost hidden" id="delete-event-btn" onclick="deleteCurrentEvent()">Delete</button>
       <button class="btn-primary hidden" id="new-event-btn" onclick="openNewEventModal()">+ New event</button>
       <button class="btn-primary" id="add-btn" onclick="openModal()">+ Add spool</button>
@@ -134,6 +134,7 @@
     </div>
 
     <div id="events-view" class="hidden">
+      <div id="events-info-line" class="fair-events-info hidden"></div>
       <div id="events-breadcrumb" class="fair-breadcrumb hidden">
         <button class="btn-ghost" onclick="closeEventGroup()">&larr; Back to all tagged models</button>
         <div id="events-breadcrumb-title" class="fair-breadcrumb-title"></div>
@@ -293,7 +294,12 @@
       <button class="modal-close" onclick="closeNewEventModal()">&#x2715;</button>
     </div>
     <div class="modal-body">
-      <div class="form-row"><label>Event name *</label><input id="ne-name" placeholder="e.g. Winter Market 2026"></div>
+      <div class="form-grid">
+        <div class="form-row" style="grid-column:1/-1"><label>Event name *</label><input id="ne-name" placeholder="e.g. Winter Market 2026"></div>
+        <div class="form-row"><label>Date</label><input type="date" id="ne-date"></div>
+        <div class="form-row"><label>Location</label><input id="ne-location" placeholder="e.g. Community Center"></div>
+        <div class="form-row" style="grid-column:1/-1"><label>Notes</label><textarea id="ne-notes" placeholder="Booth number, hours, anything else..."></textarea></div>
+      </div>
       <div id="new-event-error" class="form-error hidden"></div>
       <p id="event-carryover-note" class="fair-stock-hint" style="margin-top:12px;font-size:12px">Models currently tagged into your latest event carry over into this one with the same "to sell" numbers — sold counts start at 0.</p>
     </div>
