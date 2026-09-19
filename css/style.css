@@ -914,6 +914,36 @@ tr:hover td { background: #fafaf9; }
   font-size: 12px;
 }
 
+.fair-tagged-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 99px;
+  backdrop-filter: blur(4px);
+}
+
+.fair-tag-btn.tagged {
+  border-color: var(--success-text);
+  color: var(--success-text);
+  background: var(--success-bg);
+}
+
+.fair-inline-tosell {
+  width: 60px;
+  padding: 3px 6px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-med);
+  text-align: right;
+  background: var(--surface);
+  color: var(--text);
+}
+
 .fair-license-badge {
   position: absolute;
   top: 8px;
