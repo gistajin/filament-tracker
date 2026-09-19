@@ -393,7 +393,7 @@ function renderFair() {
       <div class="fair-card-body">
         <div class="fair-card-title">${esc(f.model)}</div>
         ${f.license ? `<div class="fair-card-license" title="${esc(f.license)}">${esc(f.license)}</div>` : ''}
-        <div class="fair-card-row"><span>Printed</span><span>${printed}</span></div>
+        <div class="fair-card-row"><span>Stock</span><span>${printed}</span></div>
         <div class="fair-card-row"><span>Price</span><span>${price ? '$' + price.toFixed(2) : '—'}</span></div>
         <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${toSell}</span></div>
         <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
@@ -426,7 +426,7 @@ function renderFairStats() {
   }, 0);
   document.getElementById('fair-stats-row').innerHTML = `
     <div class="stat-card"><div class="stat-label">Models</div><div class="stat-val">${totalModels}</div></div>
-    <div class="stat-card"><div class="stat-label">Printed</div><div class="stat-val">${totalPrinted}</div></div>
+    <div class="stat-card"><div class="stat-label">Stock</div><div class="stat-val">${totalPrinted}</div></div>
     <div class="stat-card"><div class="stat-label">Planned to sell</div><div class="stat-val">${totalToSell}</div></div>
     <div class="stat-card"><div class="stat-label">Sold</div><div class="stat-val">${totalSold}</div></div>
     <div class="stat-card"><div class="stat-label">Revenue so far</div><div class="stat-val">$${revenueSold.toFixed(2)}</div></div>
