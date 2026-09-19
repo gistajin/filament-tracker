@@ -18,4 +18,9 @@ const CONFIG = {
   // ----------------------------------------------------------
   scriptUrl: "https://script.google.com/macros/s/AKfycbwjVmN7sm7tAjTRk3xfSGiOAG7lqU7y3Ix-6i1RycGvbfAjTmvMpWSqTLjzpwwgloQyAA/exec",
 
+  // ----------------------------------------------------------
+  // Sheet tab used for the "Fair" (models to sell) section
+  // ----------------------------------------------------------
+  fairSheet: "Fair 1",
+
 };
