@@ -17,6 +17,7 @@ let fairGroupFilter = null;
 let editingFairId = null;
 let fairPhotoData = '';
 let fairColorRows = [];
+let fairSortable = null;
 
 // ---- Bootstrap ----
 
@@ -395,6 +396,8 @@ function getVisibleFairItems() {
 
 // Groups items sharing the same (trimmed) model name — used to collapse
 // multi-variant models (e.g. many keychain colors) into one card/row.
+// Groups are sorted by the lowest sortOrder among their items, so drag
+// reordering (which writes sortOrder) determines the display order.
 function groupFairItems(items) {
   const map = new Map();
   items.forEach(f => {
@@ -402,7 +405,12 @@ function groupFairItems(items) {
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(f);
   });
-  return [...map.entries()].map(([model, groupItems]) => ({ model, items: groupItems }));
+  return [...map.entries()]
+    .map(([model, groupItems]) => ({
+      model, items: groupItems,
+      order: Math.min(...groupItems.map(f => parseFloat(f.sortOrder) || 0))
+    }))
+    .sort((a, b) => a.order - b.order);
 }
 
 function openFairGroup(model) {
@@ -475,7 +483,7 @@ function fairCardHtml(f, isVariant) {
   const hasLicense = f.licenseStatus === 'have';
   const title = isVariant ? (f.variant || f.model) : f.model;
   const colors = parseFairColors(f);
-  return `<div class="fair-card">
+  return `<div class="fair-card" data-model="${escAttr((f.model || '').trim())}">
       <div class="fair-card-photo">
         ${f.photo ? `<img src="${f.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
         <span class="fair-license-badge ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need license'}</span>
@@ -515,7 +523,7 @@ function fairGroupCardHtml(g) {
   const anyHave = items.some(f => f.licenseStatus === 'have');
   const badgeClass = allHave ? 'has' : (anyHave ? 'mixed' : 'need');
   const badgeText = allHave ? 'Licensed' : (anyHave ? 'Mixed' : 'Need license');
-  return `<div class="fair-card fair-group-card" onclick="openFairGroup('${esc(g.model).replace(/'/g, "\\'")}')">
+  return `<div class="fair-card fair-group-card" data-model="${escAttr(g.model)}" onclick="openFairGroup('${esc(g.model).replace(/'/g, "\\'")}')">
       <div class="fair-card-photo">
         ${photoItem ? `<img src="${photoItem.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
         <span class="fair-license-badge ${badgeClass}">${badgeText}</span>
@@ -533,6 +541,7 @@ function fairGroupCardHtml(g) {
 }
 
 function renderFairGrid() {
+  destroyFairSortable();
   const rows = getVisibleFairItems();
   const grid = document.getElementById('fair-grid');
   if (!rows.length) {
@@ -544,6 +553,7 @@ function renderFairGrid() {
   } else {
     const groups = groupFairItems(rows);
     grid.innerHTML = groups.map(g => g.items.length > 1 ? fairGroupCardHtml(g) : fairCardHtml(g.items[0], false)).join('');
+    initFairSortable(grid);
   }
 }
 
@@ -556,7 +566,7 @@ function fairRowHtml(f, isVariant) {
   const hasLicense = f.licenseStatus === 'have';
   const title = isVariant ? (f.variant || f.model) : f.model;
   const colors = parseFairColors(f);
-  return `<tr>
+  return `<tr data-model="${escAttr((f.model || '').trim())}">
       <td>${f.photo ? `<img src="${f.photo}" class="fair-thumb" alt="">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
       <td><span style="font-weight:500">${esc(title)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}${fairColorChipsHtml(colors)}</td>
       <td><span class="fair-license-badge inline ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need'}</span></td>
@@ -591,7 +601,7 @@ function fairGroupRowHtml(g) {
   const anyHave = items.some(f => f.licenseStatus === 'have');
   const badgeClass = allHave ? 'has' : (anyHave ? 'mixed' : 'need');
   const badgeText = allHave ? 'Licensed' : (anyHave ? 'Mixed' : 'Need');
-  return `<tr class="fair-group-row" onclick="openFairGroup('${esc(g.model).replace(/'/g, "\\'")}')">
+  return `<tr class="fair-group-row" data-model="${escAttr(g.model)}" onclick="openFairGroup('${esc(g.model).replace(/'/g, "\\'")}')">
       <td>${photoItem ? `<img src="${photoItem.photo}" class="fair-thumb" alt="">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
       <td><span style="font-weight:500">${esc(g.model)}</span><span class="fair-list-note">${items.length} variants</span></td>
       <td><span class="fair-license-badge inline ${badgeClass}">${badgeText}</span></td>
@@ -605,6 +615,7 @@ function fairGroupRowHtml(g) {
 }
 
 function renderFairList() {
+  destroyFairSortable();
   const rows = getVisibleFairItems();
   const tbody = document.getElementById('fair-tbody');
   if (!rows.length) {
@@ -616,7 +627,47 @@ function renderFairList() {
   } else {
     const groups = groupFairItems(rows);
     tbody.innerHTML = groups.map(g => g.items.length > 1 ? fairGroupRowHtml(g) : fairRowHtml(g.items[0], false)).join('');
+    initFairSortable(tbody);
   }
+}
+
+// ---- Fair drag-to-reorder (top-level models/groups only) ----
+
+function destroyFairSortable() {
+  if (fairSortable) { fairSortable.destroy(); fairSortable = null; }
+}
+
+function initFairSortable(container) {
+  if (typeof Sortable === 'undefined') return; // CDN failed to load — reordering just won't be available
+  fairSortable = Sortable.create(container, {
+    animation: 150,
+    filter: '.btn-edit, .btn-delete, .fair-sold-btns, button',
+    preventOnFilter: false,
+    onEnd: handleFairReorder
+  });
+}
+
+function handleFairReorder() {
+  const container = fairDisplay === 'list' ? document.getElementById('fair-tbody') : document.getElementById('fair-grid');
+  const seen = new Set();
+  const ranked = [];
+  [...container.children].forEach(el => {
+    const key = el.dataset.model;
+    if (key && !seen.has(key)) { seen.add(key); ranked.push(key); }
+  });
+  const rankMap = new Map(ranked.map((m, i) => [m, i]));
+  const updates = [];
+  fairItems.forEach(f => {
+    const key = (f.model || '').trim();
+    if (!rankMap.has(key)) return;
+    const newOrder = String(rankMap.get(key));
+    if (f.sortOrder !== newOrder) {
+      f.sortOrder = newOrder;
+      updates.push({ id: f.id, sortOrder: newOrder });
+    }
+  });
+  if (!updates.length) return;
+  Promise.all(updates.map(u => Sheets.fairUpdate(CONFIG.fairSheet, u).catch(() => null)));
 }
 
 function renderFairStats() {
@@ -993,6 +1044,7 @@ async function deleteSpool(id) {
 
 function generateId() { return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escAttr(s) { return esc(s).replace(/"/g, '&quot;'); }
 function showToast(msg, type = '') {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'toast' + (type ? ' ' + type : '');
