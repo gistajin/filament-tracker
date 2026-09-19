@@ -71,6 +71,8 @@
         </button>
       </div>
       <select id="event-select" class="hidden" onchange="selectEvent(this.value)"></select>
+      <button class="btn-ghost hidden" id="rename-event-btn" onclick="openRenameEventModal()">Rename</button>
+      <button class="btn-ghost hidden" id="delete-event-btn" onclick="deleteCurrentEvent()">Delete</button>
       <button class="btn-primary hidden" id="new-event-btn" onclick="openNewEventModal()">+ New event</button>
       <button class="btn-primary" id="add-btn" onclick="openModal()">+ Add spool</button>
       <button class="btn-primary hidden" id="add-fair-btn" onclick="openFairModal()">+ Add model</button>
@@ -287,17 +289,17 @@
 <div id="new-event-modal-overlay" class="modal-overlay hidden" onclick="handleNewEventOverlayClick(event)">
   <div class="modal">
     <div class="modal-header">
-      <h2>New event</h2>
+      <h2 id="event-modal-title">New event</h2>
       <button class="modal-close" onclick="closeNewEventModal()">&#x2715;</button>
     </div>
     <div class="modal-body">
       <div class="form-row"><label>Event name *</label><input id="ne-name" placeholder="e.g. Winter Market 2026"></div>
       <div id="new-event-error" class="form-error hidden"></div>
-      <p class="fair-stock-hint" style="margin-top:12px;font-size:12px">Models currently tagged into your latest event carry over into this one with the same "to sell" numbers — sold counts start at 0.</p>
+      <p id="event-carryover-note" class="fair-stock-hint" style="margin-top:12px;font-size:12px">Models currently tagged into your latest event carry over into this one with the same "to sell" numbers — sold counts start at 0.</p>
     </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeNewEventModal()">Cancel</button>
-      <button class="btn-primary" id="new-event-save-btn" onclick="createNewEvent()">Create event</button>
+      <button class="btn-primary" id="new-event-save-btn" onclick="submitEventModal()"><span id="event-modal-save-label">Create event</span></button>
     </div>
   </div>
 </div>
