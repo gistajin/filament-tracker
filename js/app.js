@@ -451,7 +451,7 @@ function renderFairList() {
     const hasLicense = f.licenseStatus === 'have';
     return `<tr>
       <td>${f.photo ? `<img src="${f.photo}" class="fair-thumb" alt="">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
-      <td><span style="font-weight:500">${esc(f.model)}</span>${f.license ? `<br><span class="type-badge" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}</td>
+      <td><span style="font-weight:500">${esc(f.model)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}</td>
       <td><span class="fair-license-badge inline ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need'}</span></td>
       <td>${printed}</td>
       <td>${toSell}</td>
