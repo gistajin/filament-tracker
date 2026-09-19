@@ -214,6 +214,8 @@ header {
 }
 
 .btn-ghost:hover { background: var(--bg); }
+.btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-ghost:disabled:hover { background: transparent; }
 
 main {
   padding: 1.25rem 1.5rem;
