@@ -16,6 +16,7 @@ let fairDisplay = 'grid';
 let fairGroupFilter = null;
 let editingFairId = null;
 let fairPhotoData = '';
+let fairColorRows = [];
 
 // ---- Bootstrap ----
 
@@ -442,6 +443,21 @@ function renderFairBreadcrumb() {
     `<strong>${esc(fairGroupFilter)}</strong><span class="fair-breadcrumb-meta">${items.length} variant${items.length !== 1 ? 's' : ''} &middot; ${totalPrinted} in stock &middot; ${totalSold} sold</span>`;
 }
 
+function parseFairColors(f) {
+  if (!f.colors) return [];
+  try {
+    const arr = JSON.parse(f.colors);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function fairColorChipsHtml(colors) {
+  if (!colors.length) return '';
+  return `<div class="fair-color-chips">${colors.map(c =>
+    `<span class="fair-color-chip" title="${esc(c.name || '')} ${c.qty || 0}"><span class="fair-color-dot" style="background:${c.hex || '#ccc'}"></span>${c.qty || 0}</span>`
+  ).join('')}</div>`;
+}
+
 function fairPriceLabel(items) {
   const prices = [...new Set(items.map(f => parseFloat(f.price) || 0).filter(p => p > 0))];
   if (!prices.length) return '—';
@@ -458,6 +474,7 @@ function fairCardHtml(f, isVariant) {
   const pct = toSell > 0 ? Math.min(Math.round((sold / toSell) * 100), 100) : 0;
   const hasLicense = f.licenseStatus === 'have';
   const title = isVariant ? (f.variant || f.model) : f.model;
+  const colors = parseFairColors(f);
   return `<div class="fair-card">
       <div class="fair-card-photo">
         ${f.photo ? `<img src="${f.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
@@ -467,6 +484,7 @@ function fairCardHtml(f, isVariant) {
         <div class="fair-card-title">${esc(title)}</div>
         ${f.license ? `<div class="fair-card-license" title="${esc(f.license)}">${esc(f.license)}</div>` : ''}
         <div class="fair-card-row"><span>Stock</span><span>${printed}</span></div>
+        ${fairColorChipsHtml(colors)}
         <div class="fair-card-row"><span>Price</span><span>${price ? '$' + price.toFixed(2) : '—'}</span></div>
         <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${toSell}</span></div>
         <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
@@ -537,9 +555,10 @@ function fairRowHtml(f, isVariant) {
   const price = parseFloat(f.price) || 0;
   const hasLicense = f.licenseStatus === 'have';
   const title = isVariant ? (f.variant || f.model) : f.model;
+  const colors = parseFairColors(f);
   return `<tr>
       <td>${f.photo ? `<img src="${f.photo}" class="fair-thumb" alt="">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
-      <td><span style="font-weight:500">${esc(title)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}</td>
+      <td><span style="font-weight:500">${esc(title)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}${fairColorChipsHtml(colors)}</td>
       <td><span class="fair-license-badge inline ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need'}</span></td>
       <td>${printed}</td>
       <td>${toSell}</td>
@@ -671,6 +690,8 @@ function openFairEdit(id) {
   document.getElementById('ff-printed').value = f.printed || '';
   document.getElementById('ff-tosell').value = f.toSell || '';
   document.getElementById('ff-sold').value = f.sold || '0';
+  fairColorRows = parseFairColors(f);
+  renderFairColorRows();
   updateFairPhotoPreview();
   document.getElementById('fair-form-error').classList.add('hidden');
   document.getElementById('fair-modal-overlay').classList.remove('hidden');
@@ -684,6 +705,8 @@ function clearFairForm() {
   document.getElementById('ff-license-status').value = 'need';
   document.getElementById('ff-sold').value = '0';
   document.getElementById('fair-form-error').classList.add('hidden');
+  fairColorRows = [];
+  renderFairColorRows();
   updateFairPhotoPreview();
 }
 
@@ -699,6 +722,49 @@ function updateFairPhotoPreview() {
 
 function removeFairPhoto() { fairPhotoData = ''; updateFairPhotoPreview(); }
 
+// ---- Fair color breakdown (per-item colors & quantities) ----
+
+function renderFairColorRows() {
+  const container = document.getElementById('ff-colors-list');
+  container.innerHTML = fairColorRows.map((c, i) => `
+    <div class="fair-color-row">
+      <input type="color" value="${c.hex || '#cc0000'}" onchange="updateFairColorRow(${i},'hex',this.value)">
+      <input type="text" placeholder="Color name" value="${esc(c.name || '')}" oninput="updateFairColorRow(${i},'name',this.value)">
+      <input type="number" placeholder="Qty" min="0" value="${c.qty || ''}" oninput="updateFairColorRow(${i},'qty',this.value)">
+      <button type="button" class="btn-delete" onclick="removeFairColorRow(${i})">&times;</button>
+    </div>`).join('');
+  updateFairStockFromColors();
+}
+
+function addFairColorRow() {
+  fairColorRows.push({ name: '', hex: '#cc0000', qty: '' });
+  renderFairColorRows();
+}
+
+function removeFairColorRow(i) {
+  fairColorRows.splice(i, 1);
+  renderFairColorRows();
+}
+
+function updateFairColorRow(i, key, val) {
+  fairColorRows[i][key] = val;
+  if (key === 'qty') updateFairStockFromColors();
+}
+
+function updateFairStockFromColors() {
+  const stockInput = document.getElementById('ff-printed');
+  const hint = document.getElementById('ff-printed-hint');
+  if (fairColorRows.length) {
+    const total = fairColorRows.reduce((a, c) => a + (parseInt(c.qty) || 0), 0);
+    stockInput.value = total;
+    stockInput.readOnly = true;
+    hint.classList.remove('hidden');
+  } else {
+    stockInput.readOnly = false;
+    hint.classList.add('hidden');
+  }
+}
+
 function handleFairPhotoSelect(event) {
   const file = event.target.files[0];
   event.target.value = '';
@@ -710,7 +776,7 @@ function handleFairPhotoSelect(event) {
 }
 
 function compressImageToDataUrl(file) {
-  const MAX_CHARS = 7000; // keeps the whole request URL short and reliable (JSONP/GET transport)
+  const MAX_CHARS = 6000; // keeps the whole request URL short and reliable (JSONP/GET transport); leaves headroom for the colors breakdown sent alongside it
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('read failed'));
@@ -745,6 +811,7 @@ async function saveFairItem() {
     err.textContent = 'Model name is required.'; err.classList.remove('hidden');
     return;
   }
+  const cleanColors = fairColorRows.filter(c => c.name || c.qty);
   const payload = {
     model,
     variant: document.getElementById('ff-variant').value.trim(),
@@ -754,7 +821,8 @@ async function saveFairItem() {
     toSell: document.getElementById('ff-tosell').value,
     price: document.getElementById('ff-price').value,
     sold: document.getElementById('ff-sold').value || '0',
-    photo: fairPhotoData
+    photo: fairPhotoData,
+    colors: cleanColors.length ? JSON.stringify(cleanColors) : ''
   };
   const btn = document.getElementById('fair-save-btn');
   btn.disabled = true;
