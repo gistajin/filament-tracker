@@ -12,6 +12,7 @@ let toastTimer = null;
 let estimatorFilaments = [];
 let fairItems = [];
 let fairLoaded = false;
+let fairDisplay = 'grid';
 let editingFairId = null;
 let fairPhotoData = '';
 
@@ -105,6 +106,7 @@ function switchView(view) {
   document.getElementById('fair-view').classList.toggle('hidden', !isFair);
   document.getElementById('estimator-view').classList.toggle('hidden', !isEstimator);
   document.getElementById('stats-row').classList.toggle('hidden', isFair);
+  document.getElementById('fair-display-toggle').classList.toggle('hidden', !isFair);
   document.getElementById('filter-type').style.display = (isEstimator || isFair) ? 'none' : '';
   document.getElementById('filter-brand').style.display = (isEstimator || isFair) ? 'none' : '';
   document.getElementById('search').style.display = isEstimator ? 'none' : '';
@@ -132,6 +134,15 @@ function renderAll() {
   renderStats();
   if (currentDisplay === 'table') renderTable();
   else renderGallery();
+}
+
+function switchFairDisplay(display) {
+  fairDisplay = display;
+  document.getElementById('fair-btn-grid').classList.toggle('active', display === 'grid');
+  document.getElementById('fair-btn-list').classList.toggle('active', display === 'list');
+  document.getElementById('fair-grid').classList.toggle('hidden', display !== 'grid');
+  document.getElementById('fair-list-view').classList.toggle('hidden', display !== 'list');
+  renderFair();
 }
 
 // ---- Brand filter ----
@@ -352,7 +363,7 @@ function calculateEstimate() {
 // Shared list, editable by anyone — no owner restriction.
 
 async function loadFairData() {
-  document.getElementById('fair-grid').innerHTML = `<div class="fair-empty">Loading models...</div>`;
+  setFairLoading();
   try {
     await Sheets.fairEnsure(CONFIG.fairSheet);
     fairItems = await Sheets.fairRead(CONFIG.fairSheet);
@@ -360,8 +371,14 @@ async function loadFairData() {
     renderFair();
   } catch (e) {
     document.getElementById('fair-grid').innerHTML = '';
+    document.getElementById('fair-tbody').innerHTML = '';
     showToast('Error loading fair items: ' + e.message, 'error');
   }
+}
+
+function setFairLoading() {
+  document.getElementById('fair-grid').innerHTML = `<div class="fair-empty">Loading models...</div>`;
+  document.getElementById('fair-tbody').innerHTML = `<tr class="loading-row"><td colspan="9">Loading models...</td></tr>`;
 }
 
 function getVisibleFairItems() {
@@ -371,6 +388,11 @@ function getVisibleFairItems() {
 
 function renderFair() {
   renderFairStats();
+  if (fairDisplay === 'list') renderFairList();
+  else renderFairGrid();
+}
+
+function renderFairGrid() {
   const rows = getVisibleFairItems();
   const grid = document.getElementById('fair-grid');
   if (!rows.length) {
@@ -410,6 +432,45 @@ function renderFair() {
         </div>
       </div>
     </div>`;
+  }).join('');
+}
+
+function renderFairList() {
+  const rows = getVisibleFairItems();
+  const tbody = document.getElementById('fair-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">No models yet — add your first one to sell at the fair!</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(f => {
+    const printed = parseInt(f.printed) || 0;
+    const toSell = parseInt(f.toSell) || 0;
+    const sold = parseInt(f.sold) || 0;
+    const remaining = Math.max(toSell - sold, 0);
+    const price = parseFloat(f.price) || 0;
+    const hasLicense = f.licenseStatus === 'have';
+    return `<tr>
+      <td>${f.photo ? `<img src="${f.photo}" class="fair-thumb" alt="">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
+      <td><span style="font-weight:500">${esc(f.model)}</span>${f.license ? `<br><span class="type-badge" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}</td>
+      <td><span class="fair-license-badge inline ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need'}</span></td>
+      <td>${printed}</td>
+      <td>${toSell}</td>
+      <td>
+        <div class="fair-sold-row">
+          <strong>${sold}</strong>
+          <div class="fair-sold-btns">
+            <button class="btn-ghost" onclick="bumpFairSold('${f.id}',-1)" ${sold <= 0 ? 'disabled' : ''}>&minus;</button>
+            <button class="btn-ghost" onclick="bumpFairSold('${f.id}',1)">+</button>
+          </div>
+        </div>
+      </td>
+      <td>${remaining}</td>
+      <td>${price ? '$' + price.toFixed(2) : '—'}</td>
+      <td><div class="action-btns">
+        <button class="btn-edit" onclick="openFairEdit('${f.id}')">Edit</button>
+        <button class="btn-delete" onclick="deleteFairItem('${f.id}')">Delete</button>
+      </div></td>
+    </tr>`;
   }).join('');
 }
 
