@@ -10,6 +10,10 @@ let appSettings = {};
 let editingId = null;
 let toastTimer = null;
 let estimatorFilaments = [];
+let fairItems = [];
+let fairLoaded = false;
+let editingFairId = null;
+let fairPhotoData = '';
 
 // ---- Bootstrap ----
 
@@ -58,11 +62,13 @@ async function selectUser(user) {
 }
 
 function switchUser() {
-  activeUser = null; allFilaments = []; currentView = 'mine'; currentDisplay = 'table';
+  activeUser = null; allFilaments = [];
   document.getElementById('app-screen').classList.add('hidden');
   document.getElementById('user-select-screen').classList.remove('hidden');
   document.getElementById('search').value = '';
   document.getElementById('filter-type').value = '';
+  currentDisplay = 'table';
+  switchView('mine');
 }
 
 // ---- Data loading ----
@@ -88,17 +94,24 @@ function switchView(view) {
   currentView = view;
   document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   const addBtn = document.getElementById('add-btn');
+  const addFairBtn = document.getElementById('add-fair-btn');
   const isEstimator = view === 'estimator';
+  const isFair = view === 'fair';
   addBtn.style.display = (view === 'mine') ? '' : 'none';
-  document.getElementById('table-view').classList.add('hidden');
-  document.getElementById('gallery-view').classList.add('hidden');
-  document.getElementById('estimator-view').classList.add('hidden');
-  document.getElementById('filter-type').style.display = isEstimator ? 'none' : '';
-  document.getElementById('filter-brand').style.display = isEstimator ? 'none' : '';
+  addFairBtn.classList.toggle('hidden', !isFair);
+  document.querySelector('.display-toggle').style.display = (isEstimator || isFair) ? 'none' : '';
+  document.getElementById('table-view').classList.toggle('hidden', isEstimator || isFair || currentDisplay !== 'table');
+  document.getElementById('gallery-view').classList.toggle('hidden', isEstimator || isFair || currentDisplay !== 'gallery');
+  document.getElementById('fair-view').classList.toggle('hidden', !isFair);
+  document.getElementById('estimator-view').classList.toggle('hidden', !isEstimator);
+  document.getElementById('filter-type').style.display = (isEstimator || isFair) ? 'none' : '';
+  document.getElementById('filter-brand').style.display = (isEstimator || isFair) ? 'none' : '';
   document.getElementById('search').style.display = isEstimator ? 'none' : '';
+  document.getElementById('search').placeholder = isFair ? 'Search models...' : 'Search color, type, location...';
   if (isEstimator) {
-    document.getElementById('estimator-view').classList.remove('hidden');
     renderEstimator();
+  } else if (isFair) {
+    if (fairLoaded) renderFair(); else loadFairData();
   } else {
     renderAll();
   }
@@ -279,7 +292,6 @@ function updateEstFilament(i, key, val) {
 
 function calculateEstimate() {
   const hours = parseFloat(document.getElementById('est-hours').value) || 0;
-  const qty = parseInt(document.getElementById('est-qty').value) || 1;
   const s = appSettings;
   const laborRate = parseFloat(s.labor_rate) || 0;
   const machineRate = parseFloat(s.machine_rate) || 0;
@@ -303,13 +315,11 @@ function calculateEstimate() {
   const laborCost = hours * laborRate;
   const machineCost = hours * machineRate;
   const electricityCost = hours * electricityRate;
-  const subtotal = (filamentCost * qty) + laborCost + machineCost + electricityCost;
+  const subtotal = filamentCost + laborCost + machineCost + electricityCost;
   const profit = subtotal * (profitMargin / 100);
   const beforeTax = subtotal + profit;
   const tax = beforeTax * (taxRate / 100);
-  const discount = parseFloat(document.getElementById('est-discount').value) || 0;
-  const discountAmount = (beforeTax + tax) * (discount / 100);
-  const total = beforeTax + tax - discountAmount;
+  const total = beforeTax + tax;
 
   const fmt = n => '$' + n.toFixed(2);
 
@@ -324,7 +334,7 @@ function calculateEstimate() {
   document.getElementById('est-breakdown').innerHTML = `
     <div class="est-section-label">Filament</div>
     ${filamentRows}
-    <div class="est-section-label">Time (${hours.toFixed(1)} hrs × ${qty} print${qty !== 1 ? 's' : ''})</div>
+    <div class="est-section-label" style="margin-top:10px">Time (${hours.toFixed(1)} hrs)</div>
     <div class="est-breakdown-row"><span>Labor @ ${fmt(laborRate)}/hr</span><span>${fmt(laborCost)}</span></div>
     <div class="est-breakdown-row"><span>Machine @ ${fmt(machineRate)}/hr</span><span>${fmt(machineCost)}</span></div>
     <div class="est-breakdown-row"><span>Electricity @ ${fmt(electricityRate)}/hr</span><span>${fmt(electricityCost)}</span></div>
@@ -333,9 +343,251 @@ function calculateEstimate() {
     <div class="est-breakdown-row"><span>Profit (${profitMargin}%)</span><span>${fmt(profit)}</span></div>
     <div class="est-breakdown-row"><span>Tax (${taxRate}%)</span><span>${fmt(tax)}</span></div>
     <div class="est-divider"></div>
-    ${discount > 0 ? `<div class="est-breakdown-row" style="color:#1D9E75"><span>Discount (${discount}%)</span><span>-${fmt(discountAmount)}</span></div>` : ''}
     <div class="est-total-row"><span>Total price</span><span>${fmt(total)}</span></div>
   `;
+}
+
+// ---- FAIR ITEMS ----
+// Shared list, editable by anyone — no owner restriction.
+
+async function loadFairData() {
+  document.getElementById('fair-grid').innerHTML = `<div class="fair-empty">Loading models...</div>`;
+  try {
+    await Sheets.fairEnsure(CONFIG.fairSheet);
+    fairItems = await Sheets.fairRead(CONFIG.fairSheet);
+    fairLoaded = true;
+    renderFair();
+  } catch (e) {
+    document.getElementById('fair-grid').innerHTML = '';
+    showToast('Error loading fair items: ' + e.message, 'error');
+  }
+}
+
+function getVisibleFairItems() {
+  const q = (document.getElementById('search').value || '').toLowerCase();
+  return fairItems.filter(f => (f.model + ' ' + f.license).toLowerCase().includes(q));
+}
+
+function renderFair() {
+  renderFairStats();
+  const rows = getVisibleFairItems();
+  const grid = document.getElementById('fair-grid');
+  if (!rows.length) {
+    grid.innerHTML = `<div class="fair-empty">No models yet — add your first one to sell at the fair!</div>`;
+    return;
+  }
+  grid.innerHTML = rows.map(f => {
+    const printed = parseInt(f.printed) || 0;
+    const toSell = parseInt(f.toSell) || 0;
+    const sold = parseInt(f.sold) || 0;
+    const remaining = Math.max(toSell - sold, 0);
+    const price = parseFloat(f.price) || 0;
+    const pct = toSell > 0 ? Math.min(Math.round((sold / toSell) * 100), 100) : 0;
+    const hasLicense = f.licenseStatus === 'have';
+    return `<div class="fair-card">
+      <div class="fair-card-photo">
+        ${f.photo ? `<img src="${f.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
+        <span class="fair-license-badge ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need license'}</span>
+      </div>
+      <div class="fair-card-body">
+        <div class="fair-card-title">${esc(f.model)}</div>
+        ${f.license ? `<div class="fair-card-license" title="${esc(f.license)}">${esc(f.license)}</div>` : ''}
+        <div class="fair-card-row"><span>Printed</span><span>${printed}</span></div>
+        <div class="fair-card-row"><span>Price</span><span>${price ? '$' + price.toFixed(2) : '—'}</span></div>
+        <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${toSell}</span></div>
+        <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
+        <div class="fair-sold-row">
+          <span>Sold: <strong>${sold}</strong></span>
+          <div class="fair-sold-btns">
+            <button class="btn-ghost" onclick="bumpFairSold('${f.id}',-1)" ${sold <= 0 ? 'disabled' : ''}>&minus;</button>
+            <button class="btn-ghost" onclick="bumpFairSold('${f.id}',1)">+</button>
+          </div>
+        </div>
+        <div class="action-btns" style="margin-top:8px">
+          <button class="btn-edit" onclick="openFairEdit('${f.id}')">Edit</button>
+          <button class="btn-delete" onclick="deleteFairItem('${f.id}')">Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderFairStats() {
+  const rows = fairItems;
+  const totalModels = rows.length;
+  const totalPrinted = rows.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
+  const totalToSell = rows.reduce((a, f) => a + (parseInt(f.toSell) || 0), 0);
+  const totalSold = rows.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
+  const revenueSold = rows.reduce((a, f) => a + (parseFloat(f.price) || 0) * (parseInt(f.sold) || 0), 0);
+  const revenueProjected = rows.reduce((a, f) => {
+    const remaining = Math.max((parseInt(f.toSell) || 0) - (parseInt(f.sold) || 0), 0);
+    return a + remaining * (parseFloat(f.price) || 0);
+  }, 0);
+  document.getElementById('fair-stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Models</div><div class="stat-val">${totalModels}</div></div>
+    <div class="stat-card"><div class="stat-label">Printed</div><div class="stat-val">${totalPrinted}</div></div>
+    <div class="stat-card"><div class="stat-label">Planned to sell</div><div class="stat-val">${totalToSell}</div></div>
+    <div class="stat-card"><div class="stat-label">Sold</div><div class="stat-val">${totalSold}</div></div>
+    <div class="stat-card"><div class="stat-label">Revenue so far</div><div class="stat-val">$${revenueSold.toFixed(2)}</div></div>
+    <div class="stat-card"><div class="stat-label">Projected total</div><div class="stat-val">$${(revenueSold + revenueProjected).toFixed(2)}</div></div>`;
+}
+
+async function bumpFairSold(id, delta) {
+  const item = fairItems.find(f => f.id === id); if (!item) return;
+  const prevSold = item.sold;
+  const newSold = Math.max((parseInt(item.sold) || 0) + delta, 0);
+  item.sold = String(newSold);
+  renderFair();
+  try {
+    await Sheets.fairUpdate(CONFIG.fairSheet, { id, sold: newSold });
+  } catch (e) {
+    item.sold = prevSold;
+    renderFair();
+    showToast('Failed to update sold count: ' + e.message, 'error');
+  }
+}
+
+// ---- Fair modal ----
+
+function openFairModal() {
+  editingFairId = null;
+  fairPhotoData = '';
+  document.getElementById('fair-modal-title').textContent = 'Add model';
+  document.getElementById('fair-save-label').textContent = 'Save model';
+  clearFairForm();
+  document.getElementById('fair-modal-overlay').classList.remove('hidden');
+}
+
+function openFairEdit(id) {
+  const f = fairItems.find(x => x.id === id); if (!f) return;
+  editingFairId = id;
+  fairPhotoData = f.photo || '';
+  document.getElementById('fair-modal-title').textContent = 'Edit model';
+  document.getElementById('fair-save-label').textContent = 'Save changes';
+  document.getElementById('ff-model').value = f.model || '';
+  document.getElementById('ff-license-status').value = f.licenseStatus || 'need';
+  document.getElementById('ff-price').value = f.price || '';
+  document.getElementById('ff-license').value = f.license || '';
+  document.getElementById('ff-printed').value = f.printed || '';
+  document.getElementById('ff-tosell').value = f.toSell || '';
+  document.getElementById('ff-sold').value = f.sold || '0';
+  updateFairPhotoPreview();
+  document.getElementById('fair-form-error').classList.add('hidden');
+  document.getElementById('fair-modal-overlay').classList.remove('hidden');
+}
+
+function closeFairModal() { document.getElementById('fair-modal-overlay').classList.add('hidden'); editingFairId = null; }
+function handleFairOverlayClick(e) { if (e.target === document.getElementById('fair-modal-overlay')) closeFairModal(); }
+
+function clearFairForm() {
+  ['model', 'license', 'printed', 'tosell', 'sold', 'price'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
+  document.getElementById('ff-license-status').value = 'need';
+  document.getElementById('ff-sold').value = '0';
+  document.getElementById('fair-form-error').classList.add('hidden');
+  updateFairPhotoPreview();
+}
+
+function updateFairPhotoPreview() {
+  const img = document.getElementById('fair-photo-img');
+  const placeholder = document.getElementById('fair-photo-placeholder');
+  if (fairPhotoData) {
+    img.src = fairPhotoData; img.classList.remove('hidden'); placeholder.classList.add('hidden');
+  } else {
+    img.classList.add('hidden'); placeholder.classList.remove('hidden');
+  }
+}
+
+function removeFairPhoto() { fairPhotoData = ''; updateFairPhotoPreview(); }
+
+function handleFairPhotoSelect(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  compressImageToDataUrl(file).then(dataUrl => {
+    fairPhotoData = dataUrl;
+    updateFairPhotoPreview();
+  }).catch(() => showToast('Could not read that image.', 'error'));
+}
+
+function compressImageToDataUrl(file) {
+  const MAX_CHARS = 7000; // keeps the whole request URL short and reliable (JSONP/GET transport)
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read failed'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('decode failed'));
+      img.onload = () => {
+        let maxDim = 220, quality = 0.7, dataUrl = '';
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+          if (dataUrl.length <= MAX_CHARS) break;
+          if (quality > 0.35) quality -= 0.15; else maxDim = Math.round(maxDim * 0.8);
+        }
+        resolve(dataUrl);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function saveFairItem() {
+  const model = document.getElementById('ff-model').value.trim();
+  if (!model) {
+    const err = document.getElementById('fair-form-error');
+    err.textContent = 'Model name is required.'; err.classList.remove('hidden');
+    return;
+  }
+  const payload = {
+    model,
+    license: document.getElementById('ff-license').value.trim(),
+    licenseStatus: document.getElementById('ff-license-status').value,
+    printed: document.getElementById('ff-printed').value,
+    toSell: document.getElementById('ff-tosell').value,
+    price: document.getElementById('ff-price').value,
+    sold: document.getElementById('ff-sold').value || '0',
+    photo: fairPhotoData
+  };
+  const btn = document.getElementById('fair-save-btn');
+  btn.disabled = true;
+  document.getElementById('fair-save-label').textContent = 'Saving...';
+  try {
+    if (editingFairId) {
+      payload.id = editingFairId;
+      await Sheets.fairUpdate(CONFIG.fairSheet, payload);
+      const idx = fairItems.findIndex(f => f.id === editingFairId);
+      if (idx >= 0) fairItems[idx] = { ...fairItems[idx], ...payload };
+      showToast('Model updated!', 'success');
+    } else {
+      const res = await Sheets.fairAppend(CONFIG.fairSheet, payload);
+      fairItems.push({ ...payload, id: res.id, sold: '0' });
+      showToast('Model added!', 'success');
+    }
+    closeFairModal(); renderFair();
+  } catch (e) {
+    const err = document.getElementById('fair-form-error');
+    err.textContent = 'Save failed: ' + e.message;
+    err.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('fair-save-label').textContent = editingFairId ? 'Save changes' : 'Save model';
+  }
+}
+
+async function deleteFairItem(id) {
+  if (!confirm('Delete this model? This cannot be undone.')) return;
+  try {
+    await Sheets.fairDelete(CONFIG.fairSheet, id);
+    fairItems = fairItems.filter(f => f.id !== id);
+    renderFair(); showToast('Model deleted.', 'success');
+  } catch (e) { showToast('Delete failed: ' + e.message, 'error'); }
 }
 
 // ---- Modal ----
