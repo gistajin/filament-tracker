@@ -100,16 +100,17 @@ const Sheets = {
   async eventsRead() {
     const rows = await this._call({ action: 'eventsRead' });
     return (Array.isArray(rows) ? rows : []).map(r => ({
-      id: String(r.id || ''), name: String(r.name || ''), date: String(r.date || '')
+      id: String(r.id || ''), name: String(r.name || ''), date: String(r.date || ''),
+      location: String(r.location || ''), notes: String(r.notes || '')
     })).filter(r => r.id);
   },
 
-  async eventsCreate(name, date) {
-    return this._call({ action: 'eventsCreate', data: JSON.stringify({ name, date: date || '' }) });
+  async eventsCreate(data) {
+    return this._call({ action: 'eventsCreate', data: JSON.stringify(data) });
   },
 
-  async eventsUpdate(id, name) {
-    return this._call({ action: 'eventsUpdate', data: JSON.stringify({ id, name }) });
+  async eventsUpdate(data) {
+    return this._call({ action: 'eventsUpdate', data: JSON.stringify(data) });
   },
 
   async eventsDelete(id) {
