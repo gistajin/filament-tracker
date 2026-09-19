@@ -508,9 +508,25 @@ tr:hover td { background: #fafaf9; }
 
 .fair-color-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.fair-color-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+.fair-color-filament-select {
+  flex: 1 1 100%;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-med);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
 .fair-color-row input[type=color] {
