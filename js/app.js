@@ -104,6 +104,7 @@ function switchView(view) {
   document.getElementById('gallery-view').classList.toggle('hidden', isEstimator || isFair || currentDisplay !== 'gallery');
   document.getElementById('fair-view').classList.toggle('hidden', !isFair);
   document.getElementById('estimator-view').classList.toggle('hidden', !isEstimator);
+  document.getElementById('stats-row').classList.toggle('hidden', isFair);
   document.getElementById('filter-type').style.display = (isEstimator || isFair) ? 'none' : '';
   document.getElementById('filter-brand').style.display = (isEstimator || isFair) ? 'none' : '';
   document.getElementById('search').style.display = isEstimator ? 'none' : '';
