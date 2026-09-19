@@ -466,6 +466,16 @@ function fairColorChipsHtml(colors) {
   ).join('')}</div>`;
 }
 
+function openFairLightbox(src) {
+  document.getElementById('fair-lightbox-img').src = src;
+  document.getElementById('fair-lightbox').classList.remove('hidden');
+}
+
+function closeFairLightbox() {
+  document.getElementById('fair-lightbox').classList.add('hidden');
+  document.getElementById('fair-lightbox-img').src = '';
+}
+
 function fairPriceLabel(items) {
   const prices = [...new Set(items.map(f => parseFloat(f.price) || 0).filter(p => p > 0))];
   if (!prices.length) return '—';
@@ -485,7 +495,7 @@ function fairCardHtml(f, isVariant) {
   const colors = parseFairColors(f);
   return `<div class="fair-card" data-model="${escAttr((f.model || '').trim())}">
       <div class="fair-card-photo">
-        ${f.photo ? `<img src="${f.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
+        ${f.photo ? `<img src="${f.photo}" alt="" class="fair-photo-clickable" onclick="openFairLightbox(this.src)">` : `<div class="fair-card-noimg">No photo</div>`}
         <span class="fair-license-badge ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need license'}</span>
       </div>
       <div class="fair-card-body">
@@ -567,7 +577,7 @@ function fairRowHtml(f, isVariant) {
   const title = isVariant ? (f.variant || f.model) : f.model;
   const colors = parseFairColors(f);
   return `<tr data-model="${escAttr((f.model || '').trim())}">
-      <td>${f.photo ? `<img src="${f.photo}" class="fair-thumb" alt="">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
+      <td>${f.photo ? `<img src="${f.photo}" class="fair-thumb fair-photo-clickable" alt="" onclick="openFairLightbox(this.src)">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
       <td><span style="font-weight:500">${esc(title)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}${fairColorChipsHtml(colors)}</td>
       <td><span class="fair-license-badge inline ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need'}</span></td>
       <td>${printed}</td>
