@@ -495,6 +495,11 @@ tr:hover td { background: #fafaf9; }
   width: 100%;
 }
 
+.form-row input[readonly] {
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
 .form-row input[type=color] {
   padding: 2px 4px;
   height: 36px;
@@ -803,6 +808,24 @@ tr:hover td { background: #fafaf9; }
 .est-filament-row select { min-width: 0; }
 
 /* ---- Fair ---- */
+.fair-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 1.25rem;
+}
+
+.fair-breadcrumb-title {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.fair-breadcrumb-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-left: 8px;
+}
+
 .fair-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -863,11 +886,42 @@ tr:hover td { background: #fafaf9; }
 
 .fair-license-badge.has { background: var(--success-bg); color: var(--success-text); }
 .fair-license-badge.need { background: var(--danger-bg); color: var(--danger-text); }
+.fair-license-badge.mixed { background: #fdf3e0; color: #7a4a00; }
 
 .fair-license-badge.inline {
   position: static;
   display: inline-block;
 }
+
+/* ---- Fair multi-variant grouping ---- */
+.fair-group-card {
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.fair-group-card:hover { border-color: var(--border-med); }
+
+.fair-variant-count {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.55);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+  backdrop-filter: blur(4px);
+}
+
+.fair-group-hint {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.fair-group-row { cursor: pointer; }
 
 /* ---- Fair list view ---- */
 .fair-thumb {
