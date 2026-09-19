@@ -22,6 +22,7 @@ let events = [];
 let eventItems = [];
 let eventsDataLoaded = false;
 let currentEventSelectId = null;
+let eventGroupFilter = null;
 
 // ---- Bootstrap ----
 
@@ -130,6 +131,7 @@ function switchView(view) {
     fairGroupFilter = null;
     if (fairLoaded) renderFair(); else loadFairData();
   } else if (isEvents) {
+    eventGroupFilter = null;
     loadEventsView();
   } else {
     renderAll();
@@ -1067,25 +1069,89 @@ function eventCardHtml(f) {
     </div>`;
 }
 
+function eventGroupCardHtml(g) {
+  const items = g.items;
+  const photoItem = items.find(f => f.photo);
+  const totalToSell = items.reduce((a, f) => a + (parseInt(f.toSell) || 0), 0);
+  const totalSold = items.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
+  const remaining = Math.max(totalToSell - totalSold, 0);
+  const pct = totalToSell > 0 ? Math.min(Math.round((totalSold / totalToSell) * 100), 100) : 0;
+  const allHave = items.every(f => f.licenseStatus === 'have');
+  const anyHave = items.some(f => f.licenseStatus === 'have');
+  const badgeClass = allHave ? 'has' : (anyHave ? 'mixed' : 'need');
+  const badgeText = allHave ? 'Licensed' : (anyHave ? 'Mixed' : 'Need license');
+  return `<div class="fair-card fair-group-card" onclick="openEventGroup('${esc(g.model).replace(/'/g, "\\'")}')">
+      <div class="fair-card-photo">
+        ${photoItem ? `<img src="${photoItem.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
+        <span class="fair-license-badge ${badgeClass}">${badgeText}</span>
+        <span class="fair-variant-count">${items.length} tagged</span>
+      </div>
+      <div class="fair-card-body">
+        <div class="fair-card-title">${esc(g.model)}</div>
+        <div class="fair-card-row"><span>To sell</span><span>${totalToSell}</span></div>
+        <div class="fair-card-row"><span>Price</span><span>${fairPriceLabel(items)}</span></div>
+        <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${totalToSell}</span></div>
+        <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
+        <div class="fair-group-hint">Click to view variants &rarr;</div>
+      </div>
+    </div>`;
+}
+
+function openEventGroup(model) {
+  eventGroupFilter = model;
+  renderEvents();
+}
+
+function closeEventGroup() {
+  eventGroupFilter = null;
+  renderEvents();
+}
+
+function renderEventsBreadcrumb() {
+  const bar = document.getElementById('events-breadcrumb');
+  const statsRow = document.getElementById('events-stats-row');
+  if (eventGroupFilter === null) {
+    bar.classList.add('hidden');
+    statsRow.classList.remove('hidden');
+    return;
+  }
+  statsRow.classList.add('hidden');
+  bar.classList.remove('hidden');
+  document.getElementById('events-breadcrumb-title').innerHTML = `<strong>${esc(eventGroupFilter)}</strong>`;
+}
+
 function renderEvents() {
   populateEventSelect();
-  renderEventsStats();
+  renderEventsBreadcrumb();
+  if (eventGroupFilter === null) renderEventsStats();
   const grid = document.getElementById('events-grid');
   if (!currentEventSelectId) {
     grid.innerHTML = `<div class="fair-empty">No events yet — click "+ New event" to create one.</div>`;
     return;
   }
   const items = eventItems.filter(ei => ei.eventId === currentEventSelectId);
-  const merged = items.map(ei => {
+  let merged = items.map(ei => {
     const model = fairItems.find(f => f.id === ei.modelId);
     if (!model) return null;
     return { ...model, toSell: ei.toSell, sold: ei.sold, _eventItemId: ei.id, _isVariant: !!(model.variant && model.variant.trim()) };
   }).filter(Boolean).sort((a, b) => (parseFloat(a.sortOrder) || 0) - (parseFloat(b.sortOrder) || 0));
+
+  if (eventGroupFilter !== null) {
+    merged = merged.filter(f => (f.model || '').trim() === eventGroupFilter);
+    if (!merged.length) {
+      grid.innerHTML = `<div class="fair-empty">No variants tagged from this model.</div>`;
+      return;
+    }
+    grid.innerHTML = merged.map(f => eventCardHtml(f)).join('');
+    return;
+  }
+
   if (!merged.length) {
     grid.innerHTML = `<div class="fair-empty">No models tagged into this event yet — tag some from the Models tab.</div>`;
     return;
   }
-  grid.innerHTML = merged.map(f => eventCardHtml(f)).join('');
+  const groups = groupFairItems(merged);
+  grid.innerHTML = groups.map(g => g.items.length > 1 ? eventGroupCardHtml(g) : eventCardHtml(g.items[0])).join('');
 }
 
 async function bumpEventSold(eventItemId, delta) {
