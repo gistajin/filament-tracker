@@ -106,6 +106,8 @@ function switchView(view) {
   const addFairBtn = document.getElementById('add-fair-btn');
   const eventSelect = document.getElementById('event-select');
   const newEventBtn = document.getElementById('new-event-btn');
+  const renameEventBtn = document.getElementById('rename-event-btn');
+  const deleteEventBtn = document.getElementById('delete-event-btn');
   const isEstimator = view === 'estimator';
   const isFair = view === 'fair';
   const isEvents = view === 'events';
@@ -113,6 +115,8 @@ function switchView(view) {
   addFairBtn.classList.toggle('hidden', !isFair);
   eventSelect.classList.toggle('hidden', !isEvents);
   newEventBtn.classList.toggle('hidden', !isEvents);
+  renameEventBtn.classList.toggle('hidden', !isEvents);
+  deleteEventBtn.classList.toggle('hidden', !isEvents);
   document.querySelector('.display-toggle').style.display = (isEstimator || isFair || isEvents) ? 'none' : '';
   document.getElementById('table-view').classList.toggle('hidden', isEstimator || isFair || isEvents || currentDisplay !== 'table');
   document.getElementById('gallery-view').classList.toggle('hidden', isEstimator || isFair || isEvents || currentDisplay !== 'gallery');
@@ -1009,6 +1013,8 @@ function populateEventSelect() {
   select.innerHTML = events.map(e =>
     `<option value="${escAttr(e.id)}" ${e.id === currentEventSelectId ? 'selected' : ''}>${esc(e.name)}</option>`
   ).join('');
+  document.getElementById('rename-event-btn').disabled = !currentEventSelectId;
+  document.getElementById('delete-event-btn').disabled = !currentEventSelectId;
 }
 
 function selectEvent(id) {
@@ -1201,10 +1207,30 @@ async function untagEventItem(eventItemId) {
   } catch (e) { showToast('Failed: ' + e.message, 'error'); }
 }
 
-// ---- New event modal ----
+// ---- New / rename event modal ----
+// The same modal serves both: renamingEventId is null when creating a new
+// event, or set to the event's id when editing an existing one's name.
+
+let renamingEventId = null;
 
 function openNewEventModal() {
+  renamingEventId = null;
+  document.getElementById('event-modal-title').textContent = 'New event';
+  document.getElementById('event-modal-save-label').textContent = 'Create event';
+  document.getElementById('event-carryover-note').classList.remove('hidden');
   document.getElementById('ne-name').value = '';
+  document.getElementById('new-event-error').classList.add('hidden');
+  document.getElementById('new-event-modal-overlay').classList.remove('hidden');
+}
+
+function openRenameEventModal() {
+  const current = getSelectedEvent();
+  if (!current) return;
+  renamingEventId = current.id;
+  document.getElementById('event-modal-title').textContent = 'Rename event';
+  document.getElementById('event-modal-save-label').textContent = 'Save';
+  document.getElementById('event-carryover-note').classList.add('hidden');
+  document.getElementById('ne-name').value = current.name;
   document.getElementById('new-event-error').classList.add('hidden');
   document.getElementById('new-event-modal-overlay').classList.remove('hidden');
 }
@@ -1212,7 +1238,11 @@ function openNewEventModal() {
 function closeNewEventModal() { document.getElementById('new-event-modal-overlay').classList.add('hidden'); }
 function handleNewEventOverlayClick(e) { if (e.target === document.getElementById('new-event-modal-overlay')) closeNewEventModal(); }
 
-async function createNewEvent() {
+function getSelectedEvent() {
+  return events.find(e => e.id === currentEventSelectId) || null;
+}
+
+async function submitEventModal() {
   const name = document.getElementById('ne-name').value.trim();
   if (!name) {
     const err = document.getElementById('new-event-error');
@@ -1220,31 +1250,60 @@ async function createNewEvent() {
     return;
   }
   const btn = document.getElementById('new-event-save-btn');
-  btn.disabled = true; btn.textContent = 'Creating...';
+  const label = document.getElementById('event-modal-save-label');
+  btn.disabled = true;
   try {
-    const prevEvent = getCurrentEvent();
-    const res = await Sheets.eventsCreate(name, '');
-    const newEventId = res.id;
-    events.push({ id: newEventId, name, date: '' });
-    if (prevEvent) {
-      const prevItems = eventItems.filter(ei => ei.eventId === prevEvent.id);
-      const created = await Promise.all(prevItems.map(item =>
-        Sheets.eventItemUpsert({ eventId: newEventId, modelId: item.modelId, toSell: item.toSell, sold: '0' })
-          .then(r => ({ id: r.id, eventId: newEventId, modelId: item.modelId, toSell: item.toSell, sold: '0' }))
-      ));
-      eventItems.push(...created);
+    if (renamingEventId) {
+      label.textContent = 'Saving...';
+      await Sheets.eventsUpdate(renamingEventId, name);
+      const ev = events.find(e => e.id === renamingEventId);
+      if (ev) ev.name = name;
+      closeNewEventModal();
+      renderEvents();
+      showToast('Event renamed!', 'success');
+    } else {
+      label.textContent = 'Creating...';
+      const prevEvent = getCurrentEvent();
+      const res = await Sheets.eventsCreate(name, '');
+      const newEventId = res.id;
+      events.push({ id: newEventId, name, date: '' });
+      if (prevEvent) {
+        const prevItems = eventItems.filter(ei => ei.eventId === prevEvent.id);
+        const created = await Promise.all(prevItems.map(item =>
+          Sheets.eventItemUpsert({ eventId: newEventId, modelId: item.modelId, toSell: item.toSell, sold: '0' })
+            .then(r => ({ id: r.id, eventId: newEventId, modelId: item.modelId, toSell: item.toSell, sold: '0' }))
+        ));
+        eventItems.push(...created);
+      }
+      currentEventSelectId = newEventId;
+      closeNewEventModal();
+      renderEvents();
+      showToast('Event created!', 'success');
     }
-    currentEventSelectId = newEventId;
-    closeNewEventModal();
-    renderEvents();
-    showToast('Event created!', 'success');
   } catch (e) {
     const err = document.getElementById('new-event-error');
     err.textContent = 'Failed: ' + e.message;
     err.classList.remove('hidden');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Create event';
+    label.textContent = renamingEventId ? 'Save' : 'Create event';
+  }
+}
+
+async function deleteCurrentEvent() {
+  const current = getSelectedEvent();
+  if (!current) return;
+  if (!confirm(`Delete "${current.name}"? This also removes every model tagged into it and cannot be undone.`)) return;
+  try {
+    await Sheets.eventsDelete(current.id);
+    events = events.filter(e => e.id !== current.id);
+    eventItems = eventItems.filter(ei => ei.eventId !== current.id);
+    currentEventSelectId = events.length ? events[events.length - 1].id : null;
+    eventGroupFilter = null;
+    renderEvents();
+    showToast('Event deleted.', 'success');
+  } catch (e) {
+    showToast('Failed to delete event: ' + e.message, 'error');
   }
 }
 
