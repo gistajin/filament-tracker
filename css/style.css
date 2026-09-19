@@ -864,6 +864,26 @@ tr:hover td { background: #fafaf9; }
 .fair-license-badge.has { background: var(--success-bg); color: var(--success-text); }
 .fair-license-badge.need { background: var(--danger-bg); color: var(--danger-text); }
 
+.fair-license-badge.inline {
+  position: static;
+  display: inline-block;
+}
+
+/* ---- Fair list view ---- */
+.fair-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: contain;
+  background: #f0efe9;
+  border: 0.5px solid var(--border);
+  display: block;
+}
+
+.fair-thumb-empty {
+  background: #f0efe9;
+}
+
 .fair-card-body { padding: 10px 12px 12px; }
 
 .fair-card-title {
