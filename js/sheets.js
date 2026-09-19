@@ -108,6 +108,14 @@ const Sheets = {
     return this._call({ action: 'eventsCreate', data: JSON.stringify({ name, date: date || '' }) });
   },
 
+  async eventsUpdate(id, name) {
+    return this._call({ action: 'eventsUpdate', data: JSON.stringify({ id, name }) });
+  },
+
+  async eventsDelete(id) {
+    return this._call({ action: 'eventsDelete', data: JSON.stringify({ id }) });
+  },
+
   async eventItemsRead() {
     const rows = await this._call({ action: 'eventItemsRead' });
     return (Array.isArray(rows) ? rows : []).map(r => ({
