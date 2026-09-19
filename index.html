@@ -102,6 +102,10 @@
     </div>
 
     <div id="fair-view" class="hidden">
+      <div id="fair-breadcrumb" class="fair-breadcrumb hidden">
+        <button class="btn-ghost" onclick="closeFairGroup()">&larr; Back to all models</button>
+        <div id="fair-breadcrumb-title" class="fair-breadcrumb-title"></div>
+      </div>
       <div class="stats-row" id="fair-stats-row"></div>
       <div id="fair-grid" class="fair-grid"></div>
       <div id="fair-list-view" class="hidden">
@@ -240,6 +244,7 @@
       </div>
       <div class="form-grid">
         <div class="form-row" style="grid-column:1/-1"><label>Model name *</label><input id="ff-model" placeholder="e.g. Calabaza Lamparita"></div>
+        <div class="form-row" style="grid-column:1/-1"><label>Variant label (optional)</label><input id="ff-variant" placeholder="e.g. Perrito, Blue - only needed for multi-variant models"></div>
         <div class="form-row">
           <label>License status</label>
           <select id="ff-license-status">
