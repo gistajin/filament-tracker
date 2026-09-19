@@ -1036,6 +1036,7 @@ function renderEventsStats() {
 }
 
 function eventCardHtml(f) {
+  const printed = parseInt(f.printed) || 0;
   const toSell = parseInt(f.toSell) || 0;
   const sold = parseInt(f.sold) || 0;
   const remaining = Math.max(toSell - sold, 0);
@@ -1044,6 +1045,7 @@ function eventCardHtml(f) {
   const hasLicense = f.licenseStatus === 'have';
   const title = f._isVariant ? (f.variant || f.model) : f.model;
   const colors = parseFairColors(f);
+  const shortOnStock = toSell > 0 && printed < toSell;
   return `<div class="fair-card">
       <div class="fair-card-photo">
         ${f.photo ? `<img src="${f.photo}" alt="" class="fair-photo-clickable" onclick="openFairLightbox(this.src)">` : `<div class="fair-card-noimg">No photo</div>`}
@@ -1053,6 +1055,7 @@ function eventCardHtml(f) {
         <div class="fair-card-title">${esc(title)}</div>
         ${f.model !== title ? `<div class="fair-card-license">${esc(f.model)}</div>` : ''}
         ${fairColorChipsHtml(colors)}
+        <div class="fair-card-row"><span>Stock</span><span class="${shortOnStock ? 'fair-stock-warning' : ''}">${printed}${shortOnStock ? ' (short)' : ''}</span></div>
         <div class="fair-card-row"><span>To sell</span><span><input type="number" min="0" class="fair-inline-tosell" value="${toSell}" onchange="updateEventItemToSell('${f._eventItemId}',this.value)"></span></div>
         <div class="fair-card-row"><span>Price</span><span>${price ? '$' + price.toFixed(2) : '—'}</span></div>
         <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${toSell}</span></div>
@@ -1072,6 +1075,7 @@ function eventCardHtml(f) {
 function eventGroupCardHtml(g) {
   const items = g.items;
   const photoItem = items.find(f => f.photo);
+  const totalPrinted = items.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
   const totalToSell = items.reduce((a, f) => a + (parseInt(f.toSell) || 0), 0);
   const totalSold = items.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
   const remaining = Math.max(totalToSell - totalSold, 0);
@@ -1080,6 +1084,9 @@ function eventGroupCardHtml(g) {
   const anyHave = items.some(f => f.licenseStatus === 'have');
   const badgeClass = allHave ? 'has' : (anyHave ? 'mixed' : 'need');
   const badgeText = allHave ? 'Licensed' : (anyHave ? 'Mixed' : 'Need license');
+  // Flag per-variant shortfalls, not just the total — a surplus in one
+  // variant can otherwise mask a shortage in another.
+  const anyShort = items.some(f => (parseInt(f.toSell) || 0) > 0 && (parseInt(f.printed) || 0) < (parseInt(f.toSell) || 0));
   return `<div class="fair-card fair-group-card" onclick="openEventGroup('${esc(g.model).replace(/'/g, "\\'")}')">
       <div class="fair-card-photo">
         ${photoItem ? `<img src="${photoItem.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
@@ -1088,6 +1095,7 @@ function eventGroupCardHtml(g) {
       </div>
       <div class="fair-card-body">
         <div class="fair-card-title">${esc(g.model)}</div>
+        <div class="fair-card-row"><span>Stock</span><span class="${anyShort ? 'fair-stock-warning' : ''}">${totalPrinted}${anyShort ? ' (a variant is short)' : ''}</span></div>
         <div class="fair-card-row"><span>To sell</span><span>${totalToSell}</span></div>
         <div class="fair-card-row"><span>Price</span><span>${fairPriceLabel(items)}</span></div>
         <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${totalToSell}</span></div>
