@@ -26,6 +26,7 @@
     <div class="header-center">
       <button class="view-btn active" data-view="mine" onclick="switchView('mine')">My spools</button>
       <button class="view-btn" data-view="all" onclick="switchView('all')">All spools</button>
+      <button class="view-btn" data-view="fair" onclick="switchView('fair')">Fair</button>
       <button class="view-btn" data-view="estimator" onclick="switchView('estimator')">Estimator</button>
     </div>
     <div class="header-right">
@@ -61,6 +62,7 @@
         <option value="">All brands</option>
       </select>
       <button class="btn-primary" id="add-btn" onclick="openModal()">+ Add spool</button>
+      <button class="btn-primary hidden" id="add-fair-btn" onclick="openFairModal()">+ Add model</button>
     </div>
 
     <div class="stats-row" id="stats-row"></div>
@@ -91,6 +93,11 @@
       <div id="gallery-grid" class="gallery-grid"></div>
     </div>
 
+    <div id="fair-view" class="hidden">
+      <div class="stats-row" id="fair-stats-row"></div>
+      <div id="fair-grid" class="fair-grid"></div>
+    </div>
+
     <div id="estimator-view" class="hidden">
       <div class="estimator-layout">
 
@@ -99,19 +106,8 @@
             <div class="est-card-title">Print details</div>
 
             <div class="est-field">
-              <label>Print name / description</label>
-              <input type="text" id="est-name" placeholder="e.g. Phone stand, Vase, Cosplay helmet...">
-            </div>
-
-            <div class="est-field">
               <label>Print time (hours)</label>
               <input type="number" id="est-hours" placeholder="0.0" min="0" step="0.5"
-                oninput="calculateEstimate()" onchange="calculateEstimate()">
-            </div>
-
-            <div class="est-field">
-              <label>Quantity</label>
-              <input type="number" id="est-qty" placeholder="1" min="1" value="1"
                 oninput="calculateEstimate()" onchange="calculateEstimate()">
             </div>
 
@@ -119,11 +115,6 @@
               <label>Filaments used</label>
               <div id="est-filaments-list"></div>
               <button class="btn-ghost" style="margin-top:6px;font-size:12px;width:100%" onclick="addEstFilament()">+ Add filament</button>
-            </div>
-            <div class="est-field">
-              <label>Discount (%)</label>
-              <input type="number" id="est-discount" placeholder="e.g. 10" min="0" max="100" step="1"
-                oninput="calculateEstimate()" onchange="calculateEstimate()">
             </div>
           </div>
 
@@ -196,6 +187,49 @@
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeModal()">Cancel</button>
       <button class="btn-primary" id="save-btn" onclick="saveSpool()"><span id="save-label">Save spool</span></button>
+    </div>
+  </div>
+</div>
+
+<div id="fair-modal-overlay" class="modal-overlay hidden" onclick="handleFairOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="fair-modal-title">Add model</h2>
+      <button class="modal-close" onclick="closeFairModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fair-photo-row">
+        <div class="fair-photo-preview" id="fair-photo-preview">
+          <span id="fair-photo-placeholder">No photo</span>
+          <img id="fair-photo-img" class="hidden">
+        </div>
+        <div class="fair-photo-actions">
+          <input type="file" id="fair-photo-input" accept="image/*" class="hidden" onchange="handleFairPhotoSelect(event)">
+          <button type="button" class="btn-ghost" onclick="document.getElementById('fair-photo-input').click()">Upload photo</button>
+          <button type="button" class="btn-ghost" id="fair-photo-remove" onclick="removeFairPhoto()">Remove</button>
+          <span style="font-size:11px;color:var(--text-faint)">Stored as a small thumbnail</span>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-row" style="grid-column:1/-1"><label>Model name *</label><input id="ff-model" placeholder="e.g. Calabaza Lamparita"></div>
+        <div class="form-row">
+          <label>License status</label>
+          <select id="ff-license-status">
+            <option value="need">Need to get</option>
+            <option value="have">Have it</option>
+          </select>
+        </div>
+        <div class="form-row"><label>Price ($)</label><input type="number" id="ff-price" placeholder="12.00" step="0.01" min="0"></div>
+        <div class="form-row" style="grid-column:1/-1"><label>License / credit notes</label><textarea id="ff-license" placeholder="Site, designer, link..."></textarea></div>
+        <div class="form-row"><label>Printed (made so far)</label><input type="number" id="ff-printed" placeholder="0" min="0"></div>
+        <div class="form-row"><label># to sell</label><input type="number" id="ff-tosell" placeholder="0" min="0"></div>
+        <div class="form-row"><label>Sold</label><input type="number" id="ff-sold" placeholder="0" min="0"></div>
+      </div>
+      <div id="fair-form-error" class="form-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeFairModal()">Cancel</button>
+      <button class="btn-primary" id="fair-save-btn" onclick="saveFairItem()"><span id="fair-save-label">Save model</span></button>
     </div>
   </div>
 </div>
