@@ -74,7 +74,7 @@ const Sheets = {
       id: String(r.id || ''), model: String(r.model || ''), license: String(r.license || ''),
       licenseStatus: r.licenseStatus === 'have' ? 'have' : 'need',
       printed: String(r.printed ?? ''), toSell: String(r.toSell ?? ''), price: String(r.price ?? ''),
-      sold: String(r.sold || '0'), photo: String(r.photo || '')
+      sold: String(r.sold || '0'), photo: String(r.photo || ''), variant: String(r.variant || '')
     })).filter(r => r.id);
   },
 
