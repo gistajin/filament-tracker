@@ -60,6 +60,34 @@ const Sheets = {
 
   async ensureHeaders(sheetName) {
     return this._call({ action: 'ensureHeaders', tab: sheetName, data: '{}' });
+  },
+
+  // ---- Fair items ----
+
+  async fairEnsure(sheetName) {
+    return this._call({ action: 'fairEnsure', tab: sheetName, data: '{}' });
+  },
+
+  async fairRead(sheetName) {
+    const rows = await this._call({ action: 'fairRead', tab: sheetName });
+    return (Array.isArray(rows) ? rows : []).map(r => ({
+      id: String(r.id || ''), model: String(r.model || ''), license: String(r.license || ''),
+      licenseStatus: r.licenseStatus === 'have' ? 'have' : 'need',
+      printed: String(r.printed ?? ''), toSell: String(r.toSell ?? ''), price: String(r.price ?? ''),
+      sold: String(r.sold || '0'), photo: String(r.photo || '')
+    })).filter(r => r.id);
+  },
+
+  async fairAppend(sheetName, item) {
+    return this._call({ action: 'fairAppend', tab: sheetName, data: JSON.stringify(item) });
+  },
+
+  async fairUpdate(sheetName, item) {
+    return this._call({ action: 'fairUpdate', tab: sheetName, data: JSON.stringify(item) });
+  },
+
+  async fairDelete(sheetName, id) {
+    return this._call({ action: 'fairDelete', tab: sheetName, data: JSON.stringify({ id }) });
   }
 
 };
