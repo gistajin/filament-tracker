@@ -868,6 +868,23 @@ tr:hover td { background: #fafaf9; }
   margin-left: 8px;
 }
 
+.fair-events-info {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.fair-events-notes {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
 .fair-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
