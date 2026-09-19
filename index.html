@@ -61,6 +61,14 @@
       <select id="filter-brand" onchange="renderAll()">
         <option value="">All brands</option>
       </select>
+      <div class="display-toggle hidden" id="fair-display-toggle">
+        <button class="toggle-btn active" id="fair-btn-grid" onclick="switchFairDisplay('grid')" title="Grid view">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="0" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="8" y="0" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="8" y="8" width="6" height="6" rx="1.5" fill="currentColor"/></svg>
+        </button>
+        <button class="toggle-btn" id="fair-btn-list" onclick="switchFairDisplay('list')" title="List view">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="0" width="14" height="3" rx="1" fill="currentColor"/><rect x="0" y="5.5" width="14" height="3" rx="1" fill="currentColor"/><rect x="0" y="11" width="14" height="3" rx="1" fill="currentColor"/></svg>
+        </button>
+      </div>
       <button class="btn-primary" id="add-btn" onclick="openModal()">+ Add spool</button>
       <button class="btn-primary hidden" id="add-fair-btn" onclick="openFairModal()">+ Add model</button>
     </div>
@@ -96,6 +104,26 @@
     <div id="fair-view" class="hidden">
       <div class="stats-row" id="fair-stats-row"></div>
       <div id="fair-grid" class="fair-grid"></div>
+      <div id="fair-list-view" class="hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:7%">Photo</th>
+                <th style="width:23%">Model</th>
+                <th style="width:11%">License</th>
+                <th style="width:8%">Stock</th>
+                <th style="width:8%">To sell</th>
+                <th style="width:10%">Sold</th>
+                <th style="width:9%">Remaining</th>
+                <th style="width:8%">Price</th>
+                <th style="width:16%">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="fair-tbody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <div id="estimator-view" class="hidden">
