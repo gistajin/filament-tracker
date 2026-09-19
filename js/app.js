@@ -18,6 +18,10 @@ let editingFairId = null;
 let fairPhotoData = '';
 let fairColorRows = [];
 let fairSortable = null;
+let events = [];
+let eventItems = [];
+let eventsDataLoaded = false;
+let currentEventSelectId = null;
 
 // ---- Bootstrap ----
 
@@ -99,26 +103,34 @@ function switchView(view) {
   document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   const addBtn = document.getElementById('add-btn');
   const addFairBtn = document.getElementById('add-fair-btn');
+  const eventSelect = document.getElementById('event-select');
+  const newEventBtn = document.getElementById('new-event-btn');
   const isEstimator = view === 'estimator';
   const isFair = view === 'fair';
+  const isEvents = view === 'events';
   addBtn.style.display = (view === 'mine') ? '' : 'none';
   addFairBtn.classList.toggle('hidden', !isFair);
-  document.querySelector('.display-toggle').style.display = (isEstimator || isFair) ? 'none' : '';
-  document.getElementById('table-view').classList.toggle('hidden', isEstimator || isFair || currentDisplay !== 'table');
-  document.getElementById('gallery-view').classList.toggle('hidden', isEstimator || isFair || currentDisplay !== 'gallery');
+  eventSelect.classList.toggle('hidden', !isEvents);
+  newEventBtn.classList.toggle('hidden', !isEvents);
+  document.querySelector('.display-toggle').style.display = (isEstimator || isFair || isEvents) ? 'none' : '';
+  document.getElementById('table-view').classList.toggle('hidden', isEstimator || isFair || isEvents || currentDisplay !== 'table');
+  document.getElementById('gallery-view').classList.toggle('hidden', isEstimator || isFair || isEvents || currentDisplay !== 'gallery');
   document.getElementById('fair-view').classList.toggle('hidden', !isFair);
+  document.getElementById('events-view').classList.toggle('hidden', !isEvents);
   document.getElementById('estimator-view').classList.toggle('hidden', !isEstimator);
-  document.getElementById('stats-row').classList.toggle('hidden', isFair);
+  document.getElementById('stats-row').classList.toggle('hidden', isFair || isEvents);
   document.getElementById('fair-display-toggle').classList.toggle('hidden', !isFair);
-  document.getElementById('filter-type').style.display = (isEstimator || isFair) ? 'none' : '';
-  document.getElementById('filter-brand').style.display = (isEstimator || isFair) ? 'none' : '';
-  document.getElementById('search').style.display = isEstimator ? 'none' : '';
+  document.getElementById('filter-type').style.display = (isEstimator || isFair || isEvents) ? 'none' : '';
+  document.getElementById('filter-brand').style.display = (isEstimator || isFair || isEvents) ? 'none' : '';
+  document.getElementById('search').style.display = (isEstimator || isEvents) ? 'none' : '';
   document.getElementById('search').placeholder = isFair ? 'Search models...' : 'Search color, type, location...';
   if (isEstimator) {
     renderEstimator();
   } else if (isFair) {
     fairGroupFilter = null;
     if (fairLoaded) renderFair(); else loadFairData();
+  } else if (isEvents) {
+    loadEventsView();
   } else {
     renderAll();
   }
@@ -369,8 +381,10 @@ function calculateEstimate() {
 async function loadFairData() {
   setFairLoading();
   try {
-    await Sheets.fairEnsure(CONFIG.fairSheet);
-    fairItems = await Sheets.fairRead(CONFIG.fairSheet);
+    await Promise.all([
+      Sheets.fairEnsure(CONFIG.fairSheet).then(async () => { fairItems = await Sheets.fairRead(CONFIG.fairSheet); }),
+      eventsDataLoaded ? Promise.resolve() : loadEventsData(CONFIG.fairSheet)
+    ]);
     fairLoaded = true;
     renderFair();
   } catch (e) {
@@ -382,7 +396,7 @@ async function loadFairData() {
 
 function setFairLoading() {
   document.getElementById('fair-grid').innerHTML = `<div class="fair-empty">Loading models...</div>`;
-  document.getElementById('fair-tbody').innerHTML = `<tr class="loading-row"><td colspan="9">Loading models...</td></tr>`;
+  document.getElementById('fair-tbody').innerHTML = `<tr class="loading-row"><td colspan="7">Loading models...</td></tr>`;
 }
 
 function getVisibleFairItems() {
@@ -446,9 +460,8 @@ function renderFairBreadcrumb() {
   addBtn.textContent = '+ Add variant';
   const items = fairItems.filter(f => (f.model || '').trim() === fairGroupFilter);
   const totalPrinted = items.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
-  const totalSold = items.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
   document.getElementById('fair-breadcrumb-title').innerHTML =
-    `<strong>${esc(fairGroupFilter)}</strong><span class="fair-breadcrumb-meta">${items.length} variant${items.length !== 1 ? 's' : ''} &middot; ${totalPrinted} in stock &middot; ${totalSold} sold</span>`;
+    `<strong>${esc(fairGroupFilter)}</strong><span class="fair-breadcrumb-meta">${items.length} variant${items.length !== 1 ? 's' : ''} &middot; ${totalPrinted} in stock</span>`;
 }
 
 function parseFairColors(f) {
@@ -484,20 +497,50 @@ function fairPriceLabel(items) {
   return '$' + Math.min(...prices).toFixed(2) + '–$' + Math.max(...prices).toFixed(2);
 }
 
+// The model that's currently "active" for tagging — the most recently
+// created event. Tagging happens from the Models tab; the Events tab lets
+// you switch between this and any earlier event to review its history.
+function getCurrentEvent() {
+  return events.length ? events[events.length - 1] : null;
+}
+
+function isModelTagged(modelId, eventId) {
+  return eventItems.some(ei => ei.modelId === modelId && ei.eventId === eventId);
+}
+
+async function toggleFairTag(modelId) {
+  const curEvent = getCurrentEvent();
+  if (!curEvent) { showToast('Create an event first (Events tab).', 'error'); return; }
+  const existing = eventItems.find(ei => ei.modelId === modelId && ei.eventId === curEvent.id);
+  try {
+    if (existing) {
+      await Sheets.eventItemDelete(existing.id);
+      eventItems = eventItems.filter(ei => ei.id !== existing.id);
+      showToast('Untagged from ' + curEvent.name, 'success');
+    } else {
+      const res = await Sheets.eventItemUpsert({ eventId: curEvent.id, modelId, toSell: '0', sold: '0' });
+      eventItems.push({ id: res.id, eventId: curEvent.id, modelId, toSell: '0', sold: '0' });
+      showToast('Tagged for ' + curEvent.name, 'success');
+    }
+    renderFair();
+  } catch (e) {
+    showToast('Failed: ' + e.message, 'error');
+  }
+}
+
 function fairCardHtml(f, isVariant) {
   const printed = parseInt(f.printed) || 0;
-  const toSell = parseInt(f.toSell) || 0;
-  const sold = parseInt(f.sold) || 0;
-  const remaining = Math.max(toSell - sold, 0);
   const price = parseFloat(f.price) || 0;
-  const pct = toSell > 0 ? Math.min(Math.round((sold / toSell) * 100), 100) : 0;
   const hasLicense = f.licenseStatus === 'have';
   const title = isVariant ? (f.variant || f.model) : f.model;
   const colors = parseFairColors(f);
+  const curEvent = getCurrentEvent();
+  const tagged = curEvent ? isModelTagged(f.id, curEvent.id) : false;
   return `<div class="fair-card" data-model="${escAttr((f.model || '').trim())}">
       <div class="fair-card-photo">
         ${f.photo ? `<img src="${f.photo}" alt="" class="fair-photo-clickable" onclick="openFairLightbox(this.src)">` : `<div class="fair-card-noimg">No photo</div>`}
         <span class="fair-license-badge ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need license'}</span>
+        ${tagged ? `<span class="fair-tagged-badge">${esc(curEvent.name)}</span>` : ''}
       </div>
       <div class="fair-card-body">
         <div class="fair-card-title">${esc(title)}</div>
@@ -505,19 +548,11 @@ function fairCardHtml(f, isVariant) {
         <div class="fair-card-row"><span>Stock</span><span>${printed}</span></div>
         ${fairColorChipsHtml(colors)}
         <div class="fair-card-row"><span>Price</span><span>${price ? '$' + price.toFixed(2) : '—'}</span></div>
-        <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${toSell}</span></div>
-        <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
-        <div class="fair-sold-row">
-          <span>Sold: <strong>${sold}</strong></span>
-          <div class="fair-sold-btns">
-            <button class="btn-ghost" onclick="bumpFairSold('${f.id}',-1)" ${sold <= 0 ? 'disabled' : ''}>&minus;</button>
-            <button class="btn-ghost" onclick="bumpFairSold('${f.id}',1)">+</button>
-          </div>
-        </div>
         <div class="action-btns" style="margin-top:8px">
           <button class="btn-edit" onclick="openFairEdit('${f.id}')">Edit</button>
           <button class="btn-delete" onclick="deleteFairItem('${f.id}')">Delete</button>
         </div>
+        ${curEvent ? `<button class="btn-ghost fair-tag-btn${tagged ? ' tagged' : ''}" style="margin-top:6px;width:100%" onclick="toggleFairTag('${f.id}')">${tagged ? '&check; Tagged for ' + esc(curEvent.name) : '+ Tag for ' + esc(curEvent.name)}</button>` : ''}
       </div>
     </div>`;
 }
@@ -526,14 +561,12 @@ function fairGroupCardHtml(g) {
   const items = g.items;
   const photoItem = items.find(f => f.photo);
   const totalPrinted = items.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
-  const totalToSell = items.reduce((a, f) => a + (parseInt(f.toSell) || 0), 0);
-  const totalSold = items.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
-  const remaining = Math.max(totalToSell - totalSold, 0);
-  const pct = totalToSell > 0 ? Math.min(Math.round((totalSold / totalToSell) * 100), 100) : 0;
   const allHave = items.every(f => f.licenseStatus === 'have');
   const anyHave = items.some(f => f.licenseStatus === 'have');
   const badgeClass = allHave ? 'has' : (anyHave ? 'mixed' : 'need');
   const badgeText = allHave ? 'Licensed' : (anyHave ? 'Mixed' : 'Need license');
+  const curEvent = getCurrentEvent();
+  const taggedCount = curEvent ? items.filter(f => isModelTagged(f.id, curEvent.id)).length : 0;
   return `<div class="fair-card fair-group-card" data-model="${escAttr(g.model)}" onclick="openFairGroup('${esc(g.model).replace(/'/g, "\\'")}')">
       <div class="fair-card-photo">
         ${photoItem ? `<img src="${photoItem.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
@@ -544,8 +577,7 @@ function fairGroupCardHtml(g) {
         <div class="fair-card-title">${esc(g.model)}</div>
         <div class="fair-card-row"><span>Stock</span><span>${totalPrinted}</span></div>
         <div class="fair-card-row"><span>Price</span><span>${fairPriceLabel(items)}</span></div>
-        <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${totalToSell}</span></div>
-        <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
+        ${curEvent ? `<div class="fair-card-row"><span>Tagged for ${esc(curEvent.name)}</span><span>${taggedCount} / ${items.length}</span></div>` : ''}
         <div class="fair-group-hint">Click to view variants &rarr;</div>
       </div>
     </div>`;
@@ -570,30 +602,19 @@ function renderFairGrid() {
 
 function fairRowHtml(f, isVariant) {
   const printed = parseInt(f.printed) || 0;
-  const toSell = parseInt(f.toSell) || 0;
-  const sold = parseInt(f.sold) || 0;
-  const remaining = Math.max(toSell - sold, 0);
   const price = parseFloat(f.price) || 0;
   const hasLicense = f.licenseStatus === 'have';
   const title = isVariant ? (f.variant || f.model) : f.model;
   const colors = parseFairColors(f);
+  const curEvent = getCurrentEvent();
+  const tagged = curEvent ? isModelTagged(f.id, curEvent.id) : false;
   return `<tr data-model="${escAttr((f.model || '').trim())}">
       <td>${f.photo ? `<img src="${f.photo}" class="fair-thumb fair-photo-clickable" alt="" onclick="openFairLightbox(this.src)">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
       <td><span style="font-weight:500">${esc(title)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}${fairColorChipsHtml(colors)}</td>
       <td><span class="fair-license-badge inline ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need'}</span></td>
       <td>${printed}</td>
-      <td>${toSell}</td>
-      <td>
-        <div class="fair-sold-row">
-          <strong>${sold}</strong>
-          <div class="fair-sold-btns">
-            <button class="btn-ghost" onclick="bumpFairSold('${f.id}',-1)" ${sold <= 0 ? 'disabled' : ''}>&minus;</button>
-            <button class="btn-ghost" onclick="bumpFairSold('${f.id}',1)">+</button>
-          </div>
-        </div>
-      </td>
-      <td>${remaining}</td>
       <td>${price ? '$' + price.toFixed(2) : '—'}</td>
+      <td>${curEvent ? `<button class="btn-ghost fair-tag-btn${tagged ? ' tagged' : ''}" onclick="toggleFairTag('${f.id}')">${tagged ? '&check; Tagged' : '+ Tag'}</button>` : '—'}</td>
       <td><div class="action-btns">
         <button class="btn-edit" onclick="openFairEdit('${f.id}')">Edit</button>
         <button class="btn-delete" onclick="deleteFairItem('${f.id}')">Delete</button>
@@ -605,22 +626,19 @@ function fairGroupRowHtml(g) {
   const items = g.items;
   const photoItem = items.find(f => f.photo);
   const totalPrinted = items.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
-  const totalToSell = items.reduce((a, f) => a + (parseInt(f.toSell) || 0), 0);
-  const totalSold = items.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
-  const remaining = Math.max(totalToSell - totalSold, 0);
   const allHave = items.every(f => f.licenseStatus === 'have');
   const anyHave = items.some(f => f.licenseStatus === 'have');
   const badgeClass = allHave ? 'has' : (anyHave ? 'mixed' : 'need');
   const badgeText = allHave ? 'Licensed' : (anyHave ? 'Mixed' : 'Need');
+  const curEvent = getCurrentEvent();
+  const taggedCount = curEvent ? items.filter(f => isModelTagged(f.id, curEvent.id)).length : 0;
   return `<tr class="fair-group-row" data-model="${escAttr(g.model)}" onclick="openFairGroup('${esc(g.model).replace(/'/g, "\\'")}')">
       <td>${photoItem ? `<img src="${photoItem.photo}" class="fair-thumb" alt="">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
       <td><span style="font-weight:500">${esc(g.model)}</span><span class="fair-list-note">${items.length} variants</span></td>
       <td><span class="fair-license-badge inline ${badgeClass}">${badgeText}</span></td>
       <td>${totalPrinted}</td>
-      <td>${totalToSell}</td>
-      <td>${totalSold}</td>
-      <td>${remaining}</td>
       <td>${fairPriceLabel(items)}</td>
+      <td>${curEvent ? taggedCount + ' / ' + items.length : '—'}</td>
       <td><span style="font-size:11px;color:var(--text-muted)">View &rarr;</span></td>
     </tr>`;
 }
@@ -630,7 +648,7 @@ function renderFairList() {
   const rows = getVisibleFairItems();
   const tbody = document.getElementById('fair-tbody');
   if (!rows.length) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${fairGroupFilter !== null ? 'No variants yet — add the first one!' : 'No models yet — add your first one to sell at the fair!'}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${fairGroupFilter !== null ? 'No variants yet — add the first one!' : 'No models yet — add your first one to sell at the fair!'}</td></tr>`;
     return;
   }
   if (fairGroupFilter !== null) {
@@ -685,35 +703,12 @@ function renderFairStats() {
   const rows = fairItems;
   const totalModels = groupFairItems(rows).length;
   const totalPrinted = rows.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
-  const totalToSell = rows.reduce((a, f) => a + (parseInt(f.toSell) || 0), 0);
-  const totalSold = rows.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
-  const revenueSold = rows.reduce((a, f) => a + (parseFloat(f.price) || 0) * (parseInt(f.sold) || 0), 0);
-  const revenueProjected = rows.reduce((a, f) => {
-    const remaining = Math.max((parseInt(f.toSell) || 0) - (parseInt(f.sold) || 0), 0);
-    return a + remaining * (parseFloat(f.price) || 0);
-  }, 0);
+  const curEvent = getCurrentEvent();
+  const taggedCount = curEvent ? new Set(eventItems.filter(ei => ei.eventId === curEvent.id).map(ei => ei.modelId)).size : 0;
   document.getElementById('fair-stats-row').innerHTML = `
     <div class="stat-card"><div class="stat-label">Models</div><div class="stat-val">${totalModels}</div></div>
-    <div class="stat-card"><div class="stat-label">Stock</div><div class="stat-val">${totalPrinted}</div></div>
-    <div class="stat-card"><div class="stat-label">Planned to sell</div><div class="stat-val">${totalToSell}</div></div>
-    <div class="stat-card"><div class="stat-label">Sold</div><div class="stat-val">${totalSold}</div></div>
-    <div class="stat-card"><div class="stat-label">Revenue so far</div><div class="stat-val">$${revenueSold.toFixed(2)}</div></div>
-    <div class="stat-card"><div class="stat-label">Projected total</div><div class="stat-val">$${(revenueSold + revenueProjected).toFixed(2)}</div></div>`;
-}
-
-async function bumpFairSold(id, delta) {
-  const item = fairItems.find(f => f.id === id); if (!item) return;
-  const prevSold = item.sold;
-  const newSold = Math.max((parseInt(item.sold) || 0) + delta, 0);
-  item.sold = String(newSold);
-  renderFair();
-  try {
-    await Sheets.fairUpdate(CONFIG.fairSheet, { id, sold: newSold });
-  } catch (e) {
-    item.sold = prevSold;
-    renderFair();
-    showToast('Failed to update sold count: ' + e.message, 'error');
-  }
+    <div class="stat-card"><div class="stat-label">Total stock</div><div class="stat-val">${totalPrinted}</div></div>
+    <div class="stat-card"><div class="stat-label">${curEvent ? 'Tagged for ' + esc(curEvent.name) : 'Tagged'}</div><div class="stat-val">${taggedCount}</div></div>`;
 }
 
 // ---- Fair modal ----
@@ -750,8 +745,6 @@ function openFairEdit(id) {
   document.getElementById('ff-price').value = f.price || '';
   document.getElementById('ff-license').value = f.license || '';
   document.getElementById('ff-printed').value = f.printed || '';
-  document.getElementById('ff-tosell').value = f.toSell || '';
-  document.getElementById('ff-sold').value = f.sold || '0';
   fairColorRows = parseFairColors(f);
   renderFairColorRows();
   updateFairPhotoPreview();
@@ -763,9 +756,8 @@ function closeFairModal() { document.getElementById('fair-modal-overlay').classL
 function handleFairOverlayClick(e) { if (e.target === document.getElementById('fair-modal-overlay')) closeFairModal(); }
 
 function clearFairForm() {
-  ['model', 'variant', 'license', 'printed', 'tosell', 'sold', 'price'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
+  ['model', 'variant', 'license', 'printed', 'price'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
   document.getElementById('ff-license-status').value = 'need';
-  document.getElementById('ff-sold').value = '0';
   document.getElementById('fair-form-error').classList.add('hidden');
   fairColorRows = [];
   renderFairColorRows();
@@ -934,9 +926,7 @@ async function saveFairItem() {
     license: document.getElementById('ff-license').value.trim(),
     licenseStatus: document.getElementById('ff-license-status').value,
     printed: document.getElementById('ff-printed').value,
-    toSell: document.getElementById('ff-tosell').value,
     price: document.getElementById('ff-price').value,
-    sold: document.getElementById('ff-sold').value || '0',
     photo: fairPhotoData,
     colors: cleanColors.length ? JSON.stringify(cleanColors) : ''
   };
@@ -952,7 +942,7 @@ async function saveFairItem() {
       showToast('Model updated!', 'success');
     } else {
       const res = await Sheets.fairAppend(CONFIG.fairSheet, payload);
-      fairItems.push({ ...payload, id: res.id, sold: '0' });
+      fairItems.push({ ...payload, id: res.id, toSell: '', sold: '0' });
       showToast('Model added!', 'success');
     }
     closeFairModal(); renderFair();
@@ -973,6 +963,215 @@ async function deleteFairItem(id) {
     fairItems = fairItems.filter(f => f.id !== id);
     renderFair(); showToast('Model deleted.', 'success');
   } catch (e) { showToast('Delete failed: ' + e.message, 'error'); }
+}
+
+// ---- EVENTS ----
+// A model tagged into an event gets its own to-sell/sold record (an "event
+// item"), separate from the model's permanent catalog data. This is what
+// lets history persist across multiple fairs instead of one running total.
+
+async function loadEventsData(modelsSheetName) {
+  await Sheets.eventsEnsure(modelsSheetName);
+  const [evts, items] = await Promise.all([Sheets.eventsRead(), Sheets.eventItemsRead()]);
+  events = evts;
+  eventItems = items;
+  eventsDataLoaded = true;
+}
+
+async function loadEventsView() {
+  setEventsLoading();
+  try {
+    const tasks = [];
+    if (!fairLoaded) {
+      tasks.push(Sheets.fairEnsure(CONFIG.fairSheet).then(async () => {
+        fairItems = await Sheets.fairRead(CONFIG.fairSheet);
+        fairLoaded = true;
+      }));
+    }
+    if (!eventsDataLoaded) tasks.push(loadEventsData(CONFIG.fairSheet));
+    if (tasks.length) await Promise.all(tasks);
+    if (!currentEventSelectId && events.length) currentEventSelectId = events[events.length - 1].id;
+    renderEvents();
+  } catch (e) {
+    document.getElementById('events-grid').innerHTML = '';
+    showToast('Error loading events: ' + e.message, 'error');
+  }
+}
+
+function setEventsLoading() {
+  document.getElementById('events-grid').innerHTML = `<div class="fair-empty">Loading events...</div>`;
+}
+
+function populateEventSelect() {
+  const select = document.getElementById('event-select');
+  select.innerHTML = events.map(e =>
+    `<option value="${escAttr(e.id)}" ${e.id === currentEventSelectId ? 'selected' : ''}>${esc(e.name)}</option>`
+  ).join('');
+}
+
+function selectEvent(id) {
+  currentEventSelectId = id;
+  renderEvents();
+}
+
+function renderEventsStats() {
+  const items = eventItems.filter(ei => ei.eventId === currentEventSelectId);
+  const totalToSell = items.reduce((a, ei) => a + (parseInt(ei.toSell) || 0), 0);
+  const totalSold = items.reduce((a, ei) => a + (parseInt(ei.sold) || 0), 0);
+  let revenueSold = 0, revenueProjected = 0;
+  items.forEach(ei => {
+    const model = fairItems.find(f => f.id === ei.modelId);
+    const price = model ? parseFloat(model.price) || 0 : 0;
+    revenueSold += price * (parseInt(ei.sold) || 0);
+    revenueProjected += price * Math.max((parseInt(ei.toSell) || 0) - (parseInt(ei.sold) || 0), 0);
+  });
+  document.getElementById('events-stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Tagged models</div><div class="stat-val">${items.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Planned to sell</div><div class="stat-val">${totalToSell}</div></div>
+    <div class="stat-card"><div class="stat-label">Sold</div><div class="stat-val">${totalSold}</div></div>
+    <div class="stat-card"><div class="stat-label">Revenue so far</div><div class="stat-val">$${revenueSold.toFixed(2)}</div></div>
+    <div class="stat-card"><div class="stat-label">Projected total</div><div class="stat-val">$${(revenueSold + revenueProjected).toFixed(2)}</div></div>`;
+}
+
+function eventCardHtml(f) {
+  const toSell = parseInt(f.toSell) || 0;
+  const sold = parseInt(f.sold) || 0;
+  const remaining = Math.max(toSell - sold, 0);
+  const price = parseFloat(f.price) || 0;
+  const pct = toSell > 0 ? Math.min(Math.round((sold / toSell) * 100), 100) : 0;
+  const hasLicense = f.licenseStatus === 'have';
+  const title = f._isVariant ? (f.variant || f.model) : f.model;
+  const colors = parseFairColors(f);
+  return `<div class="fair-card">
+      <div class="fair-card-photo">
+        ${f.photo ? `<img src="${f.photo}" alt="" class="fair-photo-clickable" onclick="openFairLightbox(this.src)">` : `<div class="fair-card-noimg">No photo</div>`}
+        <span class="fair-license-badge ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need license'}</span>
+      </div>
+      <div class="fair-card-body">
+        <div class="fair-card-title">${esc(title)}</div>
+        ${f.model !== title ? `<div class="fair-card-license">${esc(f.model)}</div>` : ''}
+        ${fairColorChipsHtml(colors)}
+        <div class="fair-card-row"><span>To sell</span><span><input type="number" min="0" class="fair-inline-tosell" value="${toSell}" onchange="updateEventItemToSell('${f._eventItemId}',this.value)"></span></div>
+        <div class="fair-card-row"><span>Price</span><span>${price ? '$' + price.toFixed(2) : '—'}</span></div>
+        <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${toSell}</span></div>
+        <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
+        <div class="fair-sold-row">
+          <span>Sold: <strong>${sold}</strong></span>
+          <div class="fair-sold-btns">
+            <button class="btn-ghost" onclick="bumpEventSold('${f._eventItemId}',-1)" ${sold <= 0 ? 'disabled' : ''}>&minus;</button>
+            <button class="btn-ghost" onclick="bumpEventSold('${f._eventItemId}',1)">+</button>
+          </div>
+        </div>
+        <button class="btn-delete" style="margin-top:8px;width:100%" onclick="untagEventItem('${f._eventItemId}')">Remove from event</button>
+      </div>
+    </div>`;
+}
+
+function renderEvents() {
+  populateEventSelect();
+  renderEventsStats();
+  const grid = document.getElementById('events-grid');
+  if (!currentEventSelectId) {
+    grid.innerHTML = `<div class="fair-empty">No events yet — click "+ New event" to create one.</div>`;
+    return;
+  }
+  const items = eventItems.filter(ei => ei.eventId === currentEventSelectId);
+  const merged = items.map(ei => {
+    const model = fairItems.find(f => f.id === ei.modelId);
+    if (!model) return null;
+    return { ...model, toSell: ei.toSell, sold: ei.sold, _eventItemId: ei.id, _isVariant: !!(model.variant && model.variant.trim()) };
+  }).filter(Boolean).sort((a, b) => (parseFloat(a.sortOrder) || 0) - (parseFloat(b.sortOrder) || 0));
+  if (!merged.length) {
+    grid.innerHTML = `<div class="fair-empty">No models tagged into this event yet — tag some from the Models tab.</div>`;
+    return;
+  }
+  grid.innerHTML = merged.map(f => eventCardHtml(f)).join('');
+}
+
+async function bumpEventSold(eventItemId, delta) {
+  const item = eventItems.find(ei => ei.id === eventItemId); if (!item) return;
+  const prev = item.sold;
+  const newSold = Math.max((parseInt(item.sold) || 0) + delta, 0);
+  item.sold = String(newSold);
+  renderEvents();
+  try {
+    await Sheets.eventItemUpsert({ id: eventItemId, sold: newSold });
+  } catch (e) {
+    item.sold = prev;
+    renderEvents();
+    showToast('Failed to update sold count: ' + e.message, 'error');
+  }
+}
+
+async function updateEventItemToSell(eventItemId, val) {
+  const item = eventItems.find(ei => ei.id === eventItemId); if (!item) return;
+  const prev = item.toSell;
+  item.toSell = String(parseInt(val) || 0);
+  renderEvents();
+  try {
+    await Sheets.eventItemUpsert({ id: eventItemId, toSell: item.toSell });
+  } catch (e) {
+    item.toSell = prev;
+    renderEvents();
+    showToast('Failed to update: ' + e.message, 'error');
+  }
+}
+
+async function untagEventItem(eventItemId) {
+  if (!confirm('Remove this model from the event? This cannot be undone.')) return;
+  try {
+    await Sheets.eventItemDelete(eventItemId);
+    eventItems = eventItems.filter(ei => ei.id !== eventItemId);
+    renderEvents();
+    showToast('Removed from event.', 'success');
+  } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+}
+
+// ---- New event modal ----
+
+function openNewEventModal() {
+  document.getElementById('ne-name').value = '';
+  document.getElementById('new-event-error').classList.add('hidden');
+  document.getElementById('new-event-modal-overlay').classList.remove('hidden');
+}
+
+function closeNewEventModal() { document.getElementById('new-event-modal-overlay').classList.add('hidden'); }
+function handleNewEventOverlayClick(e) { if (e.target === document.getElementById('new-event-modal-overlay')) closeNewEventModal(); }
+
+async function createNewEvent() {
+  const name = document.getElementById('ne-name').value.trim();
+  if (!name) {
+    const err = document.getElementById('new-event-error');
+    err.textContent = 'Event name is required.'; err.classList.remove('hidden');
+    return;
+  }
+  const btn = document.getElementById('new-event-save-btn');
+  btn.disabled = true; btn.textContent = 'Creating...';
+  try {
+    const prevEvent = getCurrentEvent();
+    const res = await Sheets.eventsCreate(name, '');
+    const newEventId = res.id;
+    events.push({ id: newEventId, name, date: '' });
+    if (prevEvent) {
+      const prevItems = eventItems.filter(ei => ei.eventId === prevEvent.id);
+      const created = await Promise.all(prevItems.map(item =>
+        Sheets.eventItemUpsert({ eventId: newEventId, modelId: item.modelId, toSell: item.toSell, sold: '0' })
+          .then(r => ({ id: r.id, eventId: newEventId, modelId: item.modelId, toSell: item.toSell, sold: '0' }))
+      ));
+      eventItems.push(...created);
+    }
+    currentEventSelectId = newEventId;
+    closeNewEventModal();
+    renderEvents();
+    showToast('Event created!', 'success');
+  } catch (e) {
+    const err = document.getElementById('new-event-error');
+    err.textContent = 'Failed: ' + e.message;
+    err.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create event';
+  }
 }
 
 // ---- Modal ----
