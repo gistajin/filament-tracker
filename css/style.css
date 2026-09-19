@@ -933,6 +933,11 @@ tr:hover td { background: #fafaf9; }
   background: var(--success-bg);
 }
 
+.fair-stock-warning {
+  color: var(--danger-text);
+  font-weight: 600;
+}
+
 .fair-inline-tosell {
   width: 60px;
   padding: 3px 6px;
