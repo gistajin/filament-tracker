@@ -244,7 +244,7 @@
       </div>
       <div class="form-grid">
         <div class="form-row" style="grid-column:1/-1"><label>Model name *</label><input id="ff-model" placeholder="e.g. Calabaza Lamparita"></div>
-        <div class="form-row" style="grid-column:1/-1"><label>Variant label (optional)</label><input id="ff-variant" placeholder="e.g. Perrito, Blue - only needed for multi-variant models"></div>
+        <div class="form-row" style="grid-column:1/-1"><label>Variant label (optional)</label><input id="ff-variant" placeholder="e.g. Perrito, Blue - only needed for multi-variant models" oninput="renderFairColorRows()"></div>
         <div class="form-row">
           <label>License status</label>
           <select id="ff-license-status">
@@ -262,9 +262,9 @@
         <div class="form-row"><label># to sell</label><input type="number" id="ff-tosell" placeholder="0" min="0"></div>
         <div class="form-row"><label>Sold</label><input type="number" id="ff-sold" placeholder="0" min="0"></div>
         <div class="form-row" style="grid-column:1/-1">
-          <label>Colors &amp; quantities (optional)</label>
+          <label id="ff-colors-label">Colors &amp; quantities (optional)</label>
           <div id="ff-colors-list"></div>
-          <button type="button" class="btn-ghost" style="margin-top:6px;font-size:12px;width:100%" onclick="addFairColorRow()">+ Add color</button>
+          <button type="button" class="btn-ghost" id="ff-colors-addbtn" style="margin-top:6px;font-size:12px;width:100%" onclick="addFairColorRow()">+ Add color</button>
         </div>
       </div>
       <div id="fair-form-error" class="form-error hidden"></div>
