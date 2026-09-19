@@ -461,9 +461,10 @@ function parseFairColors(f) {
 
 function fairColorChipsHtml(colors) {
   if (!colors.length) return '';
-  return `<div class="fair-color-chips">${colors.map(c =>
-    `<span class="fair-color-chip" title="${esc(c.name || '')} ${c.qty || 0}"><span class="fair-color-dot" style="background:${c.hex || '#ccc'}"></span>${c.qty || 0}</span>`
-  ).join('')}</div>`;
+  return `<div class="fair-color-chips">${colors.map(c => {
+    const hasQty = c.qty !== undefined && c.qty !== '' && Number(c.qty) > 0;
+    return `<span class="fair-color-chip" title="${esc(c.name || '')}${hasQty ? ' — ' + c.qty : ''}"><span class="fair-color-dot" style="background:${c.hex || '#ccc'}"></span>${hasQty ? c.qty : ''}</span>`;
+  }).join('')}</div>`;
 }
 
 function openFairLightbox(src) {
@@ -807,8 +808,33 @@ function applyFairColorFilament(i, filamentId) {
   renderFairColorRows();
 }
 
+// A model is treated as a "variant" (colors carry real, stock-driving
+// quantities) when: you're adding it via "+ Add variant" inside a drilled-in
+// group, or you've typed a Variant label, or (when editing) this model name
+// already has other entries sharing it. Otherwise it's a standalone model,
+// and the same colors list is just a "filaments used" reference note that
+// never touches Stock.
+function fairIsVariantContext() {
+  if (fairGroupFilter !== null) return true;
+  const variantVal = (document.getElementById('ff-variant').value || '').trim();
+  if (variantVal) return true;
+  if (editingFairId) {
+    const current = fairItems.find(f => f.id === editingFairId);
+    if (current) {
+      const key = (current.model || '').trim();
+      if (fairItems.filter(f => (f.model || '').trim() === key).length > 1) return true;
+    }
+  }
+  return false;
+}
+
 function renderFairColorRows() {
+  const isVariant = fairIsVariantContext();
   const container = document.getElementById('ff-colors-list');
+  const label = document.getElementById('ff-colors-label');
+  const addBtn = document.getElementById('ff-colors-addbtn');
+  label.textContent = isVariant ? 'Colors & quantities (optional)' : 'Filaments used (optional)';
+  addBtn.textContent = isVariant ? '+ Add color' : '+ Add filament';
   const filamentOptions = fairFilamentOptions();
   const optionsHtml = filamentOptions.map(o => `<option value="${o.id}">${esc(o.label)}</option>`).join('');
   container.innerHTML = fairColorRows.map((c, i) => `
@@ -819,10 +845,10 @@ function renderFairColorRows() {
       </select>
       <input type="color" value="${c.hex || '#cc0000'}" onchange="updateFairColorRow(${i},'hex',this.value)">
       <input type="text" placeholder="Color name" value="${esc(c.name || '')}" oninput="updateFairColorRow(${i},'name',this.value)">
-      <input type="number" placeholder="Qty" min="0" value="${c.qty || ''}" oninput="updateFairColorRow(${i},'qty',this.value)">
+      ${isVariant ? `<input type="number" placeholder="Qty" min="0" value="${c.qty || ''}" oninput="updateFairColorRow(${i},'qty',this.value)">` : ''}
       <button type="button" class="btn-delete" onclick="removeFairColorRow(${i})">&times;</button>
     </div>`).join('');
-  updateFairStockFromColors();
+  updateFairStockFromColors(isVariant);
 }
 
 function addFairColorRow() {
@@ -840,10 +866,11 @@ function updateFairColorRow(i, key, val) {
   if (key === 'qty') updateFairStockFromColors();
 }
 
-function updateFairStockFromColors() {
+function updateFairStockFromColors(isVariant) {
+  if (isVariant === undefined) isVariant = fairIsVariantContext();
   const stockInput = document.getElementById('ff-printed');
   const hint = document.getElementById('ff-printed-hint');
-  if (fairColorRows.length) {
+  if (isVariant && fairColorRows.length) {
     const total = fairColorRows.reduce((a, c) => a + (parseInt(c.qty) || 0), 0);
     stockInput.value = total;
     stockInput.readOnly = true;
