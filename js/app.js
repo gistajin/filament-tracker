@@ -534,6 +534,25 @@ async function toggleFairTag(modelId) {
   }
 }
 
+async function tagAllVariantsForEvent(model) {
+  const curEvent = getCurrentEvent();
+  if (!curEvent) { showToast('Create an event first (Events tab).', 'error'); return; }
+  const items = fairItems.filter(f => (f.model || '').trim() === model);
+  const untagged = items.filter(f => !isModelTagged(f.id, curEvent.id));
+  if (!untagged.length) return;
+  try {
+    const created = await Promise.all(untagged.map(f =>
+      Sheets.eventItemUpsert({ eventId: curEvent.id, modelId: f.id, toSell: '0', sold: '0' })
+        .then(res => ({ id: res.id, eventId: curEvent.id, modelId: f.id, toSell: '0', sold: '0' }))
+    ));
+    eventItems.push(...created);
+    renderFair();
+    showToast(`Tagged ${untagged.length} variant${untagged.length !== 1 ? 's' : ''} for ${curEvent.name}`, 'success');
+  } catch (e) {
+    showToast('Failed: ' + e.message, 'error');
+  }
+}
+
 function fairCardHtml(f, isVariant) {
   const printed = parseInt(f.printed) || 0;
   const price = parseFloat(f.price) || 0;
@@ -585,6 +604,7 @@ function fairGroupCardHtml(g) {
         <div class="fair-card-row"><span>Price</span><span>${fairPriceLabel(items)}</span></div>
         ${curEvent ? `<div class="fair-card-row"><span>Tagged for ${esc(curEvent.name)}</span><span>${taggedCount} / ${items.length}</span></div>` : ''}
         <div class="fair-group-hint">Click to view variants &rarr;</div>
+        ${curEvent ? `<button class="btn-ghost fair-tag-btn${taggedCount === items.length ? ' tagged' : ''}" style="margin-top:6px;width:100%" onclick="event.stopPropagation(); tagAllVariantsForEvent('${esc(g.model).replace(/'/g, "\\'")}')" ${taggedCount === items.length ? 'disabled' : ''}>${taggedCount === items.length ? '&check; All tagged for ' + esc(curEvent.name) : '+ Tag all for ' + esc(curEvent.name)}</button>` : ''}
       </div>
     </div>`;
 }
@@ -644,7 +664,7 @@ function fairGroupRowHtml(g) {
       <td><span class="fair-license-badge inline ${badgeClass}">${badgeText}</span></td>
       <td>${totalPrinted}</td>
       <td>${fairPriceLabel(items)}</td>
-      <td>${curEvent ? taggedCount + ' / ' + items.length : '—'}</td>
+      <td>${curEvent ? `<button class="btn-ghost fair-tag-btn${taggedCount === items.length ? ' tagged' : ''}" onclick="event.stopPropagation(); tagAllVariantsForEvent('${esc(g.model).replace(/'/g, "\\'")}')" ${taggedCount === items.length ? 'disabled' : ''}>${taggedCount === items.length ? '&check; ' : 'Tag all '}${taggedCount}/${items.length}</button>` : '—'}</td>
       <td><span style="font-size:11px;color:var(--text-muted)">View &rarr;</span></td>
     </tr>`;
 }
@@ -1134,8 +1154,24 @@ function renderEventsBreadcrumb() {
   document.getElementById('events-breadcrumb-title').innerHTML = `<strong>${esc(eventGroupFilter)}</strong>`;
 }
 
+function renderEventsInfoLine() {
+  const el = document.getElementById('events-info-line');
+  const current = getSelectedEvent();
+  if (!current || (!current.date && !current.location && !current.notes)) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  const parts = [];
+  if (current.date) parts.push('&#128197; ' + esc(formatEventDate(current.date)));
+  if (current.location) parts.push('&#128205; ' + esc(current.location));
+  el.innerHTML = parts.join(' &nbsp;&middot;&nbsp; ') + (current.notes ? `<div class="fair-events-notes">${esc(current.notes)}</div>` : '');
+  el.classList.remove('hidden');
+}
+
 function renderEvents() {
   populateEventSelect();
+  renderEventsInfoLine();
   renderEventsBreadcrumb();
   if (eventGroupFilter === null) renderEventsStats();
   const grid = document.getElementById('events-grid');
@@ -1207,9 +1243,9 @@ async function untagEventItem(eventItemId) {
   } catch (e) { showToast('Failed: ' + e.message, 'error'); }
 }
 
-// ---- New / rename event modal ----
+// ---- New / edit event modal ----
 // The same modal serves both: renamingEventId is null when creating a new
-// event, or set to the event's id when editing an existing one's name.
+// event, or set to the event's id when editing an existing one's details.
 
 let renamingEventId = null;
 
@@ -1219,6 +1255,9 @@ function openNewEventModal() {
   document.getElementById('event-modal-save-label').textContent = 'Create event';
   document.getElementById('event-carryover-note').classList.remove('hidden');
   document.getElementById('ne-name').value = '';
+  document.getElementById('ne-date').value = '';
+  document.getElementById('ne-location').value = '';
+  document.getElementById('ne-notes').value = '';
   document.getElementById('new-event-error').classList.add('hidden');
   document.getElementById('new-event-modal-overlay').classList.remove('hidden');
 }
@@ -1227,10 +1266,13 @@ function openRenameEventModal() {
   const current = getSelectedEvent();
   if (!current) return;
   renamingEventId = current.id;
-  document.getElementById('event-modal-title').textContent = 'Rename event';
+  document.getElementById('event-modal-title').textContent = 'Edit event';
   document.getElementById('event-modal-save-label').textContent = 'Save';
   document.getElementById('event-carryover-note').classList.add('hidden');
   document.getElementById('ne-name').value = current.name;
+  document.getElementById('ne-date').value = current.date || '';
+  document.getElementById('ne-location').value = current.location || '';
+  document.getElementById('ne-notes').value = current.notes || '';
   document.getElementById('new-event-error').classList.add('hidden');
   document.getElementById('new-event-modal-overlay').classList.remove('hidden');
 }
@@ -1242,6 +1284,13 @@ function getSelectedEvent() {
   return events.find(e => e.id === currentEventSelectId) || null;
 }
 
+function formatEventDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 async function submitEventModal() {
   const name = document.getElementById('ne-name').value.trim();
   if (!name) {
@@ -1249,24 +1298,27 @@ async function submitEventModal() {
     err.textContent = 'Event name is required.'; err.classList.remove('hidden');
     return;
   }
+  const date = document.getElementById('ne-date').value;
+  const location = document.getElementById('ne-location').value.trim();
+  const notes = document.getElementById('ne-notes').value.trim();
   const btn = document.getElementById('new-event-save-btn');
   const label = document.getElementById('event-modal-save-label');
   btn.disabled = true;
   try {
     if (renamingEventId) {
       label.textContent = 'Saving...';
-      await Sheets.eventsUpdate(renamingEventId, name);
+      await Sheets.eventsUpdate({ id: renamingEventId, name, date, location, notes });
       const ev = events.find(e => e.id === renamingEventId);
-      if (ev) ev.name = name;
+      if (ev) Object.assign(ev, { name, date, location, notes });
       closeNewEventModal();
       renderEvents();
-      showToast('Event renamed!', 'success');
+      showToast('Event updated!', 'success');
     } else {
       label.textContent = 'Creating...';
       const prevEvent = getCurrentEvent();
-      const res = await Sheets.eventsCreate(name, '');
+      const res = await Sheets.eventsCreate({ name, date, location, notes });
       const newEventId = res.id;
-      events.push({ id: newEventId, name, date: '' });
+      events.push({ id: newEventId, name, date, location, notes });
       if (prevEvent) {
         const prevItems = eventItems.filter(ei => ei.eventId === prevEvent.id);
         const created = await Promise.all(prevItems.map(item =>
