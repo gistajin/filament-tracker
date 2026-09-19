@@ -801,3 +801,159 @@ tr:hover td { background: #fafaf9; }
 }
 
 .est-filament-row select { min-width: 0; }
+
+/* ---- Fair ---- */
+.fair-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.fair-empty {
+  grid-column: 1/-1;
+  text-align: center;
+  padding: 2.5rem;
+  color: var(--text-muted);
+  font-size: 13px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.fair-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.fair-card-photo {
+  width: 100%;
+  height: 130px;
+  position: relative;
+  background: #f0efe9;
+}
+
+.fair-card-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fair-card-noimg {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.fair-license-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 99px;
+}
+
+.fair-license-badge.has { background: var(--success-bg); color: var(--success-text); }
+.fair-license-badge.need { background: var(--danger-bg); color: var(--danger-text); }
+
+.fair-card-body { padding: 10px 12px 12px; }
+
+.fair-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.fair-card-license {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fair-card-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text);
+  padding: 3px 0;
+}
+
+.fair-card-row span:first-child { color: var(--text-muted); }
+
+.fair-progress {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: #e8e8e4;
+  margin: 6px 0 8px;
+  overflow: hidden;
+}
+
+.fair-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: #1D9E75;
+}
+
+.fair-sold-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.fair-sold-btns { display: flex; gap: 4px; }
+.fair-sold-btns .btn-ghost { padding: 2px 10px; font-size: 13px; font-weight: 600; }
+.fair-sold-btns .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---- Fair modal photo uploader ---- */
+.fair-photo-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.fair-photo-preview {
+  width: 84px;
+  height: 84px;
+  border-radius: var(--radius-md);
+  background: #f0efe9;
+  border: 0.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.fair-photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#fair-photo-placeholder {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.fair-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
