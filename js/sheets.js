@@ -89,6 +89,39 @@ const Sheets = {
 
   async fairDelete(sheetName, id) {
     return this._call({ action: 'fairDelete', tab: sheetName, data: JSON.stringify({ id }) });
+  },
+
+  // ---- Events ----
+
+  async eventsEnsure(modelsSheetName) {
+    return this._call({ action: 'eventsEnsure', tab: modelsSheetName, data: '{}' });
+  },
+
+  async eventsRead() {
+    const rows = await this._call({ action: 'eventsRead' });
+    return (Array.isArray(rows) ? rows : []).map(r => ({
+      id: String(r.id || ''), name: String(r.name || ''), date: String(r.date || '')
+    })).filter(r => r.id);
+  },
+
+  async eventsCreate(name, date) {
+    return this._call({ action: 'eventsCreate', data: JSON.stringify({ name, date: date || '' }) });
+  },
+
+  async eventItemsRead() {
+    const rows = await this._call({ action: 'eventItemsRead' });
+    return (Array.isArray(rows) ? rows : []).map(r => ({
+      id: String(r.id || ''), eventId: String(r.eventId || ''), modelId: String(r.modelId || ''),
+      toSell: String(r.toSell ?? '0'), sold: String(r.sold ?? '0')
+    })).filter(r => r.id);
+  },
+
+  async eventItemUpsert(payload) {
+    return this._call({ action: 'eventItemUpsert', data: JSON.stringify(payload) });
+  },
+
+  async eventItemDelete(id) {
+    return this._call({ action: 'eventItemDelete', data: JSON.stringify({ id }) });
   }
 
 };
