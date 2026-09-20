@@ -257,7 +257,7 @@
       </div>
       <div class="form-grid">
         <div class="form-row" style="grid-column:1/-1"><label>Model name *</label><input id="ff-model" placeholder="e.g. Calabaza Lamparita"></div>
-        <div class="form-row" style="grid-column:1/-1"><label>Variant label (optional)</label><input id="ff-variant" placeholder="e.g. Perrito, Blue - only needed for multi-variant models" oninput="renderFairColorRows()"></div>
+        <div class="form-row" style="grid-column:1/-1"><label>Variant label (optional)</label><input id="ff-variant" placeholder="e.g. Perrito, Blue - only needed for multi-variant models"></div>
         <div class="form-row">
           <label>License status</label>
           <select id="ff-license-status">
@@ -274,6 +274,10 @@
         </div>
         <div class="form-row" style="grid-column:1/-1">
           <label id="ff-colors-label">Colors &amp; quantities (optional)</label>
+          <label class="fair-qty-toggle-label">
+            <input type="checkbox" id="ff-colors-qty-toggle" onchange="toggleFairColorsQtyMode(this.checked)">
+            Track a separate quantity per color (adds up to Stock)
+          </label>
           <div id="ff-colors-list"></div>
           <button type="button" class="btn-ghost" id="ff-colors-addbtn" style="margin-top:6px;font-size:12px;width:100%" onclick="addFairColorRow()">+ Add color</button>
         </div>
