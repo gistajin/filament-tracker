@@ -508,6 +508,24 @@ tr:hover td { background: #fafaf9; }
   margin-top: 2px;
 }
 
+.fair-qty-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  margin: 4px 0 8px;
+  cursor: pointer;
+}
+
+.fair-qty-toggle-label input[type=checkbox] {
+  width: auto;
+  cursor: pointer;
+}
+
 .fair-color-row {
   display: flex;
   flex-wrap: wrap;
