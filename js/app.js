@@ -504,6 +504,8 @@ function fairColorChipsHtml(colorData) {
   ).join('')}</div>`;
 }
 
+function fairLightboxSrc(f) { return escAttr(f.photoFullUrl || f.photo).replace(/'/g, "\\'"); }
+
 function openFairLightbox(src) {
   document.getElementById('fair-lightbox-img').src = src;
   document.getElementById('fair-lightbox').classList.remove('hidden');
@@ -581,7 +583,7 @@ function fairCardHtml(f, isVariant) {
   const tagged = curEvent ? isModelTagged(f.id, curEvent.id) : false;
   return `<div class="fair-card" data-model="${escAttr((f.model || '').trim())}">
       <div class="fair-card-photo">
-        ${f.photo ? `<img src="${f.photo}" alt="" class="fair-photo-clickable" onclick="openFairLightbox(this.src)">` : `<div class="fair-card-noimg">No photo</div>`}
+        ${(f.photo || f.photoFullUrl) ? `<img src="${f.photo || f.photoFullUrl}" alt="" class="fair-photo-clickable" onclick="openFairLightbox('${fairLightboxSrc(f)}')">` : `<div class="fair-card-noimg">No photo</div>`}
         <span class="fair-license-badge ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need license'}</span>
         ${tagged ? `<span class="fair-tagged-badge">${esc(curEvent.name)}</span>` : ''}
       </div>
@@ -603,7 +605,7 @@ function fairCardHtml(f, isVariant) {
 
 function fairGroupCardHtml(g) {
   const items = g.items;
-  const photoItem = items.find(f => f.photo);
+  const photoItem = items.find(f => f.photo || f.photoFullUrl);
   const totalPrinted = items.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
   const allHave = items.every(f => f.licenseStatus === 'have');
   const anyHave = items.some(f => f.licenseStatus === 'have');
@@ -613,7 +615,7 @@ function fairGroupCardHtml(g) {
   const taggedCount = curEvent ? items.filter(f => isModelTagged(f.id, curEvent.id)).length : 0;
   return `<div class="fair-card fair-group-card" data-model="${escAttr(g.model)}" onclick="openFairGroup('${esc(g.model).replace(/'/g, "\\'")}')">
       <div class="fair-card-photo">
-        ${photoItem ? `<img src="${photoItem.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
+        ${photoItem ? `<img src="${photoItem.photo || photoItem.photoFullUrl}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
         <span class="fair-license-badge ${badgeClass}">${badgeText}</span>
         <span class="fair-variant-count">${items.length} variants</span>
       </div>
@@ -654,7 +656,7 @@ function fairRowHtml(f, isVariant) {
   const curEvent = getCurrentEvent();
   const tagged = curEvent ? isModelTagged(f.id, curEvent.id) : false;
   return `<tr data-model="${escAttr((f.model || '').trim())}">
-      <td>${f.photo ? `<img src="${f.photo}" class="fair-thumb fair-photo-clickable" alt="" onclick="openFairLightbox(this.src)">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
+      <td>${(f.photo || f.photoFullUrl) ? `<img src="${f.photo || f.photoFullUrl}" class="fair-thumb fair-photo-clickable" alt="" onclick="openFairLightbox('${fairLightboxSrc(f)}')">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
       <td><span style="font-weight:500">${esc(title)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}${fairColorChipsHtml(colors)}</td>
       <td><span class="fair-license-badge inline ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need'}</span></td>
       <td>${printed}</td>
@@ -670,7 +672,7 @@ function fairRowHtml(f, isVariant) {
 
 function fairGroupRowHtml(g) {
   const items = g.items;
-  const photoItem = items.find(f => f.photo);
+  const photoItem = items.find(f => f.photo || f.photoFullUrl);
   const totalPrinted = items.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
   const allHave = items.every(f => f.licenseStatus === 'have');
   const anyHave = items.some(f => f.licenseStatus === 'have');
@@ -679,7 +681,7 @@ function fairGroupRowHtml(g) {
   const curEvent = getCurrentEvent();
   const taggedCount = curEvent ? items.filter(f => isModelTagged(f.id, curEvent.id)).length : 0;
   return `<tr class="fair-group-row" data-model="${escAttr(g.model)}" onclick="openFairGroup('${esc(g.model).replace(/'/g, "\\'")}')">
-      <td>${photoItem ? `<img src="${photoItem.photo}" class="fair-thumb" alt="">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
+      <td>${photoItem ? `<img src="${photoItem.photo || photoItem.photoFullUrl}" class="fair-thumb" alt="">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
       <td><span style="font-weight:500">${esc(g.model)}</span><span class="fair-list-note">${items.length} variants</span></td>
       <td><span class="fair-license-badge inline ${badgeClass}">${badgeText}</span></td>
       <td>${totalPrinted}</td>
@@ -797,6 +799,7 @@ function openFairEdit(id) {
   document.getElementById('ff-price').value = f.price || '';
   document.getElementById('ff-license').value = f.license || '';
   document.getElementById('ff-printed').value = f.printed || '';
+  document.getElementById('ff-photo-full-url').value = f.photoFullUrl || '';
   const savedColors = parseFairColors(f);
   fairColorRows = savedColors.items;
   fairColorsQtyMode = savedColors.items.length ? savedColors.mode === 'qty' : fairIsVariantContext();
@@ -810,7 +813,7 @@ function closeFairModal() { document.getElementById('fair-modal-overlay').classL
 function handleFairOverlayClick(e) { if (e.target === document.getElementById('fair-modal-overlay')) closeFairModal(); }
 
 function clearFairForm() {
-  ['model', 'variant', 'license', 'printed', 'price'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
+  ['model', 'variant', 'license', 'printed', 'price', 'photo-full-url'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
   document.getElementById('ff-license-status').value = 'need';
   document.getElementById('fair-form-error').classList.add('hidden');
   fairColorRows = [];
@@ -994,6 +997,7 @@ async function saveFairItem() {
     printed: document.getElementById('ff-printed').value,
     price: document.getElementById('ff-price').value,
     photo: fairPhotoData,
+    photoFullUrl: document.getElementById('ff-photo-full-url').value.trim(),
     colors: cleanColors.length ? JSON.stringify({ mode: fairColorsQtyMode ? 'qty' : 'info', items: cleanColors }) : ''
   };
   const btn = document.getElementById('fair-save-btn');
@@ -1114,7 +1118,7 @@ function eventCardHtml(f) {
   const shortOnStock = toSell > 0 && printed < toSell;
   return `<div class="fair-card">
       <div class="fair-card-photo">
-        ${f.photo ? `<img src="${f.photo}" alt="" class="fair-photo-clickable" onclick="openFairLightbox(this.src)">` : `<div class="fair-card-noimg">No photo</div>`}
+        ${(f.photo || f.photoFullUrl) ? `<img src="${f.photo || f.photoFullUrl}" alt="" class="fair-photo-clickable" onclick="openFairLightbox('${fairLightboxSrc(f)}')">` : `<div class="fair-card-noimg">No photo</div>`}
         <span class="fair-license-badge ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need license'}</span>
       </div>
       <div class="fair-card-body">
@@ -1140,7 +1144,7 @@ function eventCardHtml(f) {
 
 function eventGroupCardHtml(g) {
   const items = g.items;
-  const photoItem = items.find(f => f.photo);
+  const photoItem = items.find(f => f.photo || f.photoFullUrl);
   const totalPrinted = items.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
   const totalToSell = items.reduce((a, f) => a + (parseInt(f.toSell) || 0), 0);
   const totalSold = items.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
@@ -1155,7 +1159,7 @@ function eventGroupCardHtml(g) {
   const anyShort = items.some(f => (parseInt(f.toSell) || 0) > 0 && (parseInt(f.printed) || 0) < (parseInt(f.toSell) || 0));
   return `<div class="fair-card fair-group-card" onclick="openEventGroup('${esc(g.model).replace(/'/g, "\\'")}')">
       <div class="fair-card-photo">
-        ${photoItem ? `<img src="${photoItem.photo}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
+        ${photoItem ? `<img src="${photoItem.photo || photoItem.photoFullUrl}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
         <span class="fair-license-badge ${badgeClass}">${badgeText}</span>
         <span class="fair-variant-count">${items.length} tagged</span>
       </div>
