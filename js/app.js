@@ -17,6 +17,8 @@ let fairGroupFilter = null;
 let editingFairId = null;
 let fairPhotoData = '';
 let fairColorRows = [];
+let fairColorsQtyMode = false;
+let fairModalAddingVariant = false;
 let fairSortable = null;
 let events = [];
 let eventItems = [];
@@ -470,20 +472,36 @@ function renderFairBreadcrumb() {
     `<strong>${esc(fairGroupFilter)}</strong><span class="fair-breadcrumb-meta">${items.length} variant${items.length !== 1 ? 's' : ''} &middot; ${totalPrinted} in stock</span>`;
 }
 
+// Colors are stored as { mode: 'qty'|'info', items: [{name,hex,qty}] }.
+// 'qty' means each row is a real stock count that sums into Stock (e.g. "5
+// red, 3 blue keychains"); 'info' means the list is just which filaments
+// went into this item (e.g. "this ghost lamp uses white + black PLA") and
+// never touches Stock. Whether an item is a variant is unrelated to this —
+// a variant can be multi-filament-but-single-stock just like a standalone
+// model can. Older saved data was a bare array with no mode, so it's
+// inferred from whether any row had a qty.
 function parseFairColors(f) {
-  if (!f.colors) return [];
+  if (!f.colors) return { mode: 'info', items: [] };
   try {
-    const arr = JSON.parse(f.colors);
-    return Array.isArray(arr) ? arr : [];
-  } catch (e) { return []; }
+    const parsed = JSON.parse(f.colors);
+    if (Array.isArray(parsed)) {
+      const hasQty = parsed.some(c => c.qty !== undefined && c.qty !== '' && Number(c.qty) > 0);
+      return { mode: hasQty ? 'qty' : 'info', items: parsed };
+    }
+    if (parsed && Array.isArray(parsed.items)) {
+      return { mode: parsed.mode === 'qty' ? 'qty' : 'info', items: parsed.items };
+    }
+    return { mode: 'info', items: [] };
+  } catch (e) { return { mode: 'info', items: [] }; }
 }
 
-function fairColorChipsHtml(colors) {
-  if (!colors.length) return '';
-  return `<div class="fair-color-chips">${colors.map(c => {
-    const hasQty = c.qty !== undefined && c.qty !== '' && Number(c.qty) > 0;
-    return `<span class="fair-color-chip" title="${esc(c.name || '')}${hasQty ? ' — ' + c.qty : ''}"><span class="fair-color-dot" style="background:${c.hex || '#ccc'}"></span>${hasQty ? c.qty : ''}</span>`;
-  }).join('')}</div>`;
+function fairColorChipsHtml(colorData) {
+  const items = colorData.items || [];
+  if (!items.length) return '';
+  const showQty = colorData.mode === 'qty';
+  return `<div class="fair-color-chips">${items.map(c =>
+    `<span class="fair-color-chip" title="${esc(c.name || '')}${showQty && c.qty ? ' — ' + c.qty : ''}"><span class="fair-color-dot" style="background:${c.hex || '#ccc'}"></span>${showQty && c.qty ? c.qty : ''}</span>`
+  ).join('')}</div>`;
 }
 
 function openFairLightbox(src) {
@@ -747,9 +765,10 @@ function renderFairStats() {
 function openFairModal(presetModel) {
   editingFairId = null;
   fairPhotoData = '';
+  const targetModel = presetModel !== undefined ? presetModel : fairGroupFilter;
+  fairModalAddingVariant = targetModel !== null && targetModel !== undefined;
   clearFairForm();
   const modelInput = document.getElementById('ff-model');
-  const targetModel = presetModel !== undefined ? presetModel : fairGroupFilter;
   if (targetModel !== null && targetModel !== undefined) {
     document.getElementById('fair-modal-title').textContent = 'Add variant';
     document.getElementById('fair-save-label').textContent = 'Save variant';
@@ -766,6 +785,7 @@ function openFairModal(presetModel) {
 function openFairEdit(id) {
   const f = fairItems.find(x => x.id === id); if (!f) return;
   editingFairId = id;
+  fairModalAddingVariant = false;
   fairPhotoData = f.photo || '';
   document.getElementById('fair-modal-title').textContent = 'Edit model';
   document.getElementById('fair-save-label').textContent = 'Save changes';
@@ -777,7 +797,9 @@ function openFairEdit(id) {
   document.getElementById('ff-price').value = f.price || '';
   document.getElementById('ff-license').value = f.license || '';
   document.getElementById('ff-printed').value = f.printed || '';
-  fairColorRows = parseFairColors(f);
+  const savedColors = parseFairColors(f);
+  fairColorRows = savedColors.items;
+  fairColorsQtyMode = savedColors.items.length ? savedColors.mode === 'qty' : fairIsVariantContext();
   renderFairColorRows();
   updateFairPhotoPreview();
   document.getElementById('fair-form-error').classList.add('hidden');
@@ -792,6 +814,7 @@ function clearFairForm() {
   document.getElementById('ff-license-status').value = 'need';
   document.getElementById('fair-form-error').classList.add('hidden');
   fairColorRows = [];
+  fairColorsQtyMode = fairIsVariantContext(); // sensible default; user can flip the toggle either way
   renderFairColorRows();
   updateFairPhotoPreview();
 }
@@ -838,7 +861,11 @@ function applyFairColorFilament(i, filamentId) {
 // already has other entries sharing it. Otherwise it's a standalone model,
 // and the same colors list is just a "filaments used" reference note that
 // never touches Stock.
+// Only used to pick a sensible DEFAULT for the qty-tracking toggle when a
+// modal opens — not authoritative. The user can flip it either way, and
+// once saved, the item's own stored mode wins over this guess.
 function fairIsVariantContext() {
+  if (fairModalAddingVariant) return true;
   if (fairGroupFilter !== null) return true;
   const variantVal = (document.getElementById('ff-variant').value || '').trim();
   if (variantVal) return true;
@@ -852,13 +879,20 @@ function fairIsVariantContext() {
   return false;
 }
 
+function toggleFairColorsQtyMode(checked) {
+  fairColorsQtyMode = checked;
+  renderFairColorRows();
+}
+
 function renderFairColorRows() {
-  const isVariant = fairIsVariantContext();
+  const qtyMode = fairColorsQtyMode;
   const container = document.getElementById('ff-colors-list');
   const label = document.getElementById('ff-colors-label');
   const addBtn = document.getElementById('ff-colors-addbtn');
-  label.textContent = isVariant ? 'Colors & quantities (optional)' : 'Filaments used (optional)';
-  addBtn.textContent = isVariant ? '+ Add color' : '+ Add filament';
+  const qtyToggle = document.getElementById('ff-colors-qty-toggle');
+  qtyToggle.checked = qtyMode;
+  label.textContent = qtyMode ? 'Colors & quantities (optional)' : 'Filaments used (optional)';
+  addBtn.textContent = qtyMode ? '+ Add color' : '+ Add filament';
   const filamentOptions = fairFilamentOptions();
   const optionsHtml = filamentOptions.map(o => `<option value="${o.id}">${esc(o.label)}</option>`).join('');
   container.innerHTML = fairColorRows.map((c, i) => `
@@ -869,10 +903,10 @@ function renderFairColorRows() {
       </select>
       <input type="color" value="${c.hex || '#cc0000'}" onchange="updateFairColorRow(${i},'hex',this.value)">
       <input type="text" placeholder="Color name" value="${esc(c.name || '')}" oninput="updateFairColorRow(${i},'name',this.value)">
-      ${isVariant ? `<input type="number" placeholder="Qty" min="0" value="${c.qty || ''}" oninput="updateFairColorRow(${i},'qty',this.value)">` : ''}
+      ${qtyMode ? `<input type="number" placeholder="Qty" min="0" value="${c.qty || ''}" oninput="updateFairColorRow(${i},'qty',this.value)">` : ''}
       <button type="button" class="btn-delete" onclick="removeFairColorRow(${i})">&times;</button>
     </div>`).join('');
-  updateFairStockFromColors(isVariant);
+  updateFairStockFromColors(qtyMode);
 }
 
 function addFairColorRow() {
@@ -890,11 +924,11 @@ function updateFairColorRow(i, key, val) {
   if (key === 'qty') updateFairStockFromColors();
 }
 
-function updateFairStockFromColors(isVariant) {
-  if (isVariant === undefined) isVariant = fairIsVariantContext();
+function updateFairStockFromColors(qtyMode) {
+  if (qtyMode === undefined) qtyMode = fairColorsQtyMode;
   const stockInput = document.getElementById('ff-printed');
   const hint = document.getElementById('ff-printed-hint');
-  if (isVariant && fairColorRows.length) {
+  if (qtyMode && fairColorRows.length) {
     const total = fairColorRows.reduce((a, c) => a + (parseInt(c.qty) || 0), 0);
     stockInput.value = total;
     stockInput.readOnly = true;
@@ -960,7 +994,7 @@ async function saveFairItem() {
     printed: document.getElementById('ff-printed').value,
     price: document.getElementById('ff-price').value,
     photo: fairPhotoData,
-    colors: cleanColors.length ? JSON.stringify(cleanColors) : ''
+    colors: cleanColors.length ? JSON.stringify({ mode: fairColorsQtyMode ? 'qty' : 'info', items: cleanColors }) : ''
   };
   const btn = document.getElementById('fair-save-btn');
   btn.disabled = true;
