@@ -385,7 +385,7 @@ tr:hover td { background: #fafaf9; }
   color: white;
 }
 
-.action-btns { display: flex; gap: 6px; }
+.action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 
 .btn-edit {
   padding: 4px 10px;
