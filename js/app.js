@@ -576,6 +576,7 @@ function fairCardHtml(f, isVariant) {
         <div class="action-btns" style="margin-top:8px">
           <button class="btn-edit" onclick="openFairEdit('${f.id}')">Edit</button>
           <button class="btn-delete" onclick="deleteFairItem('${f.id}')">Delete</button>
+          ${!isVariant ? `<button class="btn-edit" title="Add a variant of this model" onclick="openFairModal('${esc((f.model || '').trim()).replace(/'/g, "\\'")}')">+ Variant</button>` : ''}
         </div>
         ${curEvent ? `<button class="btn-ghost fair-tag-btn${tagged ? ' tagged' : ''}" style="margin-top:6px;width:100%" onclick="toggleFairTag('${f.id}')">${tagged ? '&check; Tagged for ' + esc(curEvent.name) : '+ Tag for ' + esc(curEvent.name)}</button>` : ''}
       </div>
@@ -644,6 +645,7 @@ function fairRowHtml(f, isVariant) {
       <td><div class="action-btns">
         <button class="btn-edit" onclick="openFairEdit('${f.id}')">Edit</button>
         <button class="btn-delete" onclick="deleteFairItem('${f.id}')">Delete</button>
+        ${!isVariant ? `<button class="btn-edit" title="Add a variant of this model" onclick="openFairModal('${esc((f.model || '').trim()).replace(/'/g, "\\'")}')">+ Variant</button>` : ''}
       </div></td>
     </tr>`;
 }
@@ -739,15 +741,19 @@ function renderFairStats() {
 
 // ---- Fair modal ----
 
-function openFairModal() {
+// presetModel: pass a model name to force "Add variant" mode for that model
+// regardless of drill-down state (e.g. the "+ Variant" button on a
+// standalone card). Omit it to fall back to the current drill-down, if any.
+function openFairModal(presetModel) {
   editingFairId = null;
   fairPhotoData = '';
   clearFairForm();
   const modelInput = document.getElementById('ff-model');
-  if (fairGroupFilter !== null) {
+  const targetModel = presetModel !== undefined ? presetModel : fairGroupFilter;
+  if (targetModel !== null && targetModel !== undefined) {
     document.getElementById('fair-modal-title').textContent = 'Add variant';
     document.getElementById('fair-save-label').textContent = 'Save variant';
-    modelInput.value = fairGroupFilter;
+    modelInput.value = targetModel;
     modelInput.readOnly = true;
   } else {
     document.getElementById('fair-modal-title').textContent = 'Add model';
