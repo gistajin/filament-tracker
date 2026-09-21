@@ -63,36 +63,19 @@ body {
 }
 
 .logo-mark {
-  width: 48px;
-  height: 48px;
-  background: var(--accent);
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
   border-radius: 12px;
   margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.logo-mark::before {
-  content: '';
-  width: 24px;
-  height: 24px;
-  border: 3px solid white;
-  border-radius: 50%;
-  position: absolute;
+  display: block;
 }
 
 .logo-mark.small {
   width: 30px;
   height: 30px;
+  margin: 0;
   border-radius: 8px;
-}
-
-.logo-mark.small::before {
-  width: 14px;
-  height: 14px;
-  border-width: 2px;
 }
 
 .user-buttons {
