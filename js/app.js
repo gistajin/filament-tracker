@@ -26,9 +26,29 @@ let eventsDataLoaded = false;
 let currentEventSelectId = null;
 let eventGroupFilter = null;
 
+// ---- Theme ----
+
+function currentTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+}
+
+function updateThemeIcons() {
+  const dark = currentTheme() === 'dark';
+  document.querySelectorAll('.theme-icon-sun').forEach(el => el.classList.toggle('hidden', dark));
+  document.querySelectorAll('.theme-icon-moon').forEach(el => el.classList.toggle('hidden', !dark));
+}
+
+function toggleTheme() {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('theme', next); } catch (e) {}
+  updateThemeIcons();
+}
+
 // ---- Bootstrap ----
 
 window.addEventListener('DOMContentLoaded', () => {
+  updateThemeIcons();
   if (!CONFIG.scriptUrl || CONFIG.scriptUrl === 'YOUR_SCRIPT_URL_HERE') {
     showSetupWarning();
     return;
