@@ -820,6 +820,7 @@ function openFairEdit(id) {
   document.getElementById('ff-license').value = f.license || '';
   document.getElementById('ff-printed').value = f.printed || '';
   document.getElementById('ff-photo-full-url').value = f.photoFullUrl || '';
+  document.getElementById('ff-photo-gallery').value = f.photoGallery || '';
   document.getElementById('ff-public-name').value = f.publicName || '';
   document.getElementById('ff-public-credit').checked = !!f.publicCredit;
   document.getElementById('ff-hide-from-catalog').checked = !!f.hideFromCatalog;
@@ -836,7 +837,7 @@ function closeFairModal() { document.getElementById('fair-modal-overlay').classL
 function handleFairOverlayClick(e) { if (e.target === document.getElementById('fair-modal-overlay')) closeFairModal(); }
 
 function clearFairForm() {
-  ['model', 'variant', 'license', 'printed', 'price', 'photo-full-url', 'public-name'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
+  ['model', 'variant', 'license', 'printed', 'price', 'photo-full-url', 'photo-gallery', 'public-name'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
   document.getElementById('ff-license-status').value = 'need';
   document.getElementById('ff-public-credit').checked = false;
   document.getElementById('ff-hide-from-catalog').checked = false;
@@ -1023,6 +1024,7 @@ async function saveFairItem() {
     price: document.getElementById('ff-price').value,
     photo: fairPhotoData,
     photoFullUrl: document.getElementById('ff-photo-full-url').value.trim(),
+    photoGallery: document.getElementById('ff-photo-gallery').value.split('\n').map(s => s.trim()).filter(Boolean).join('\n'),
     publicName: document.getElementById('ff-public-name').value.trim(),
     publicCredit: document.getElementById('ff-public-credit').checked,
     hideFromCatalog: document.getElementById('ff-hide-from-catalog').checked,
