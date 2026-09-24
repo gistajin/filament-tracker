@@ -358,7 +358,10 @@
 </div>
 
 <div id="fair-lightbox" class="fair-lightbox hidden" onclick="closeFairLightbox()">
+  <button class="fair-lightbox-nav fair-lightbox-prev hidden" onclick="event.stopPropagation(); fairLightboxPrev()" aria-label="Previous photo">&#10094;</button>
   <img id="fair-lightbox-img" alt="">
+  <button class="fair-lightbox-nav fair-lightbox-next hidden" onclick="event.stopPropagation(); fairLightboxNext()" aria-label="Next photo">&#10095;</button>
+  <div id="fair-lightbox-counter" class="fair-lightbox-counter hidden"></div>
 </div>
 
 <div id="toast" class="toast hidden"></div>
