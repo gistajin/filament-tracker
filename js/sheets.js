@@ -76,7 +76,8 @@ const Sheets = {
       printed: String(r.printed ?? ''), toSell: String(r.toSell ?? ''), price: String(r.price ?? ''),
       sold: String(r.sold || '0'), photo: String(r.photo || ''), variant: String(r.variant || ''),
       colors: String(r.colors || ''), sortOrder: String(r.sortOrder ?? '0'),
-      photoFullUrl: String(r.photoFullUrl || ''), publicCredit: !!r.publicCredit
+      photoFullUrl: String(r.photoFullUrl || ''), publicCredit: !!r.publicCredit,
+      hideFromCatalog: !!r.hideFromCatalog
     })).filter(r => r.id);
   },
 
