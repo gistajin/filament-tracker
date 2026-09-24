@@ -77,7 +77,7 @@ const Sheets = {
       sold: String(r.sold || '0'), photo: String(r.photo || ''), variant: String(r.variant || ''),
       colors: String(r.colors || ''), sortOrder: String(r.sortOrder ?? '0'),
       photoFullUrl: String(r.photoFullUrl || ''), publicCredit: !!r.publicCredit,
-      hideFromCatalog: !!r.hideFromCatalog
+      hideFromCatalog: !!r.hideFromCatalog, publicName: String(r.publicName || '')
     })).filter(r => r.id);
   },
 
