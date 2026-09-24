@@ -524,17 +524,63 @@ function fairColorChipsHtml(colorData) {
   ).join('')}</div>`;
 }
 
-function fairLightboxSrc(f) { return escAttr(f.photoFullUrl || f.photo).replace(/'/g, "\\'"); }
+let fairLightboxPhotos = [];
+let fairLightboxIndex = 0;
 
-function openFairLightbox(src) {
-  document.getElementById('fair-lightbox-img').src = src;
+function fairPhotosFor(f) {
+  const list = [];
+  const cover = f.photoFullUrl || f.photo;
+  if (cover) list.push(cover);
+  (f.photoGallery ? f.photoGallery.split('\n') : []).forEach(u => {
+    u = u.trim();
+    if (u && !list.includes(u)) list.push(u);
+  });
+  return list;
+}
+
+function openFairLightboxFor(id) {
+  const f = fairItems.find(x => x.id === id);
+  if (!f) return;
+  fairLightboxPhotos = fairPhotosFor(f);
+  if (!fairLightboxPhotos.length) return;
+  fairLightboxIndex = 0;
+  showFairLightboxPhoto();
   document.getElementById('fair-lightbox').classList.remove('hidden');
+}
+
+function showFairLightboxPhoto() {
+  document.getElementById('fair-lightbox-img').src = fairLightboxPhotos[fairLightboxIndex] || '';
+  const multi = fairLightboxPhotos.length > 1;
+  document.querySelectorAll('.fair-lightbox-nav').forEach(b => b.classList.toggle('hidden', !multi));
+  const counter = document.getElementById('fair-lightbox-counter');
+  counter.classList.toggle('hidden', !multi);
+  if (multi) counter.textContent = `${fairLightboxIndex + 1} / ${fairLightboxPhotos.length}`;
+}
+
+function fairLightboxPrev() {
+  if (!fairLightboxPhotos.length) return;
+  fairLightboxIndex = (fairLightboxIndex - 1 + fairLightboxPhotos.length) % fairLightboxPhotos.length;
+  showFairLightboxPhoto();
+}
+
+function fairLightboxNext() {
+  if (!fairLightboxPhotos.length) return;
+  fairLightboxIndex = (fairLightboxIndex + 1) % fairLightboxPhotos.length;
+  showFairLightboxPhoto();
 }
 
 function closeFairLightbox() {
   document.getElementById('fair-lightbox').classList.add('hidden');
   document.getElementById('fair-lightbox-img').src = '';
+  fairLightboxPhotos = [];
 }
+
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('fair-lightbox').classList.contains('hidden')) return;
+  if (e.key === 'ArrowLeft') fairLightboxPrev();
+  else if (e.key === 'ArrowRight') fairLightboxNext();
+  else if (e.key === 'Escape') closeFairLightbox();
+});
 
 function fairPriceLabel(items) {
   const prices = [...new Set(items.map(f => parseFloat(f.price) || 0).filter(p => p > 0))];
@@ -603,7 +649,7 @@ function fairCardHtml(f, isVariant) {
   const tagged = curEvent ? isModelTagged(f.id, curEvent.id) : false;
   return `<div class="fair-card" data-model="${escAttr((f.model || '').trim())}">
       <div class="fair-card-photo">
-        ${(f.photo || f.photoFullUrl) ? `<img src="${f.photo || f.photoFullUrl}" alt="" class="fair-photo-clickable" onclick="openFairLightbox('${fairLightboxSrc(f)}')">` : `<div class="fair-card-noimg">No photo</div>`}
+        ${(f.photo || f.photoFullUrl) ? `<img src="${f.photo || f.photoFullUrl}" alt="" class="fair-photo-clickable" onclick="openFairLightboxFor('${escAttr(f.id)}')">` : `<div class="fair-card-noimg">No photo</div>`}
         <span class="fair-license-badge ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need license'}</span>
         ${tagged ? `<span class="fair-tagged-badge">${esc(curEvent.name)}</span>` : ''}
       </div>
@@ -676,7 +722,7 @@ function fairRowHtml(f, isVariant) {
   const curEvent = getCurrentEvent();
   const tagged = curEvent ? isModelTagged(f.id, curEvent.id) : false;
   return `<tr data-model="${escAttr((f.model || '').trim())}">
-      <td>${(f.photo || f.photoFullUrl) ? `<img src="${f.photo || f.photoFullUrl}" class="fair-thumb fair-photo-clickable" alt="" onclick="openFairLightbox('${fairLightboxSrc(f)}')">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
+      <td>${(f.photo || f.photoFullUrl) ? `<img src="${f.photo || f.photoFullUrl}" class="fair-thumb fair-photo-clickable" alt="" onclick="openFairLightboxFor('${escAttr(f.id)}')">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
       <td><span style="font-weight:500">${esc(title)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}${fairColorChipsHtml(colors)}</td>
       <td><span class="fair-license-badge inline ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need'}</span></td>
       <td>${printed}</td>
@@ -1148,7 +1194,7 @@ function eventCardHtml(f) {
   const shortOnStock = toSell > 0 && printed < toSell;
   return `<div class="fair-card">
       <div class="fair-card-photo">
-        ${(f.photo || f.photoFullUrl) ? `<img src="${f.photo || f.photoFullUrl}" alt="" class="fair-photo-clickable" onclick="openFairLightbox('${fairLightboxSrc(f)}')">` : `<div class="fair-card-noimg">No photo</div>`}
+        ${(f.photo || f.photoFullUrl) ? `<img src="${f.photo || f.photoFullUrl}" alt="" class="fair-photo-clickable" onclick="openFairLightboxFor('${escAttr(f.id)}')">` : `<div class="fair-card-noimg">No photo</div>`}
         <span class="fair-license-badge ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need license'}</span>
       </div>
       <div class="fair-card-body">
