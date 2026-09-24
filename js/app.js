@@ -821,6 +821,7 @@ function openFairEdit(id) {
   document.getElementById('ff-printed').value = f.printed || '';
   document.getElementById('ff-photo-full-url').value = f.photoFullUrl || '';
   document.getElementById('ff-public-credit').checked = !!f.publicCredit;
+  document.getElementById('ff-hide-from-catalog').checked = !!f.hideFromCatalog;
   const savedColors = parseFairColors(f);
   fairColorRows = savedColors.items;
   fairColorsQtyMode = savedColors.items.length ? savedColors.mode === 'qty' : fairIsVariantContext();
@@ -837,6 +838,7 @@ function clearFairForm() {
   ['model', 'variant', 'license', 'printed', 'price', 'photo-full-url'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
   document.getElementById('ff-license-status').value = 'need';
   document.getElementById('ff-public-credit').checked = false;
+  document.getElementById('ff-hide-from-catalog').checked = false;
   document.getElementById('fair-form-error').classList.add('hidden');
   fairColorRows = [];
   fairColorsQtyMode = fairIsVariantContext(); // sensible default; user can flip the toggle either way
@@ -1021,6 +1023,7 @@ async function saveFairItem() {
     photo: fairPhotoData,
     photoFullUrl: document.getElementById('ff-photo-full-url').value.trim(),
     publicCredit: document.getElementById('ff-public-credit').checked,
+    hideFromCatalog: document.getElementById('ff-hide-from-catalog').checked,
     colors: cleanColors.length ? JSON.stringify({ mode: fairColorsQtyMode ? 'qty' : 'info', items: cleanColors }) : ''
   };
   const btn = document.getElementById('fair-save-btn');
