@@ -78,7 +78,7 @@ const Sheets = {
       colors: String(r.colors || ''), sortOrder: String(r.sortOrder ?? '0'),
       photoFullUrl: String(r.photoFullUrl || ''), publicCredit: !!r.publicCredit,
       hideFromCatalog: !!r.hideFromCatalog, publicName: String(r.publicName || ''),
-      photoGallery: String(r.photoGallery || '')
+      photoGallery: String(r.photoGallery || ''), categories: String(r.categories || '')
     })).filter(r => r.id);
   },
 
@@ -96,6 +96,10 @@ const Sheets = {
 
   async fairRenameModel(sheetName, from, to) {
     return this._call({ action: 'fairRenameModel', tab: sheetName, data: JSON.stringify({ from, to }) });
+  },
+
+  async fairSetCategories(sheetName, items) {
+    return this._call({ action: 'fairSetCategories', tab: sheetName, data: JSON.stringify({ items }) });
   },
 
   // ---- Events ----
