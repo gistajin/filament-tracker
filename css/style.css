@@ -563,6 +563,14 @@ tr:hover td { background: var(--bg); }
   cursor: pointer;
 }
 
+.fair-cat-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 18px;
+}
+
+.fair-cat-checks .fair-qty-toggle-label { margin: 2px 0; }
+
 .fair-color-row {
   display: flex;
   flex-wrap: wrap;
