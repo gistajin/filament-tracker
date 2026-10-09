@@ -94,6 +94,10 @@ const Sheets = {
     return this._call({ action: 'fairDelete', tab: sheetName, data: JSON.stringify({ id }) });
   },
 
+  async fairRenameModel(sheetName, from, to) {
+    return this._call({ action: 'fairRenameModel', tab: sheetName, data: JSON.stringify({ from, to }) });
+  },
+
   // ---- Events ----
 
   async eventsEnsure(modelsSheetName) {
