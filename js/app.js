@@ -49,6 +49,7 @@ function toggleTheme() {
 
 window.addEventListener('DOMContentLoaded', () => {
   updateThemeIcons();
+  buildFairCategoryChecks();
   if (!CONFIG.scriptUrl || CONFIG.scriptUrl === 'YOUR_SCRIPT_URL_HERE') {
     showSetupWarning();
     return;
@@ -464,6 +465,51 @@ function openFairGroup(model) {
 function closeFairGroup() {
   fairGroupFilter = null;
   renderFair();
+}
+
+// Public catalog categories — keep this list in sync with js/config.js in the catalog site.
+const FAIR_CATEGORIES = [
+  { key: 'keychains', label: 'Keychains' },
+  { key: 'jewelry', label: 'Jewelry' },
+  { key: 'figurines', label: 'Figurines' },
+  { key: 'fidget', label: 'Fidget toys' },
+  { key: 'misc', label: 'Misc' }
+];
+
+function buildFairCategoryChecks() {
+  document.getElementById('ff-categories').innerHTML = FAIR_CATEGORIES.map(c =>
+    `<label class="fair-qty-toggle-label"><input type="checkbox" value="${c.key}"> ${esc(c.label)}</label>`).join('');
+}
+
+// Canonical form: known keys only, in list order, comma-separated.
+function normFairCategories(value) {
+  const keys = Array.isArray(value) ? value : String(value || '').split(',').map(s => s.trim());
+  return FAIR_CATEGORIES.filter(c => keys.includes(c.key)).map(c => c.key).join(',');
+}
+
+function setFairCategoryChecks(value) {
+  const keys = normFairCategories(value).split(',');
+  document.querySelectorAll('#ff-categories input').forEach(el => { el.checked = keys.includes(el.value); });
+}
+
+function getFairCategoryChecks() {
+  return normFairCategories(Array.from(document.querySelectorAll('#ff-categories input:checked')).map(el => el.value));
+}
+
+function fairGroupCategories(name) {
+  const keys = new Set();
+  fairItems.filter(f => (f.model || '').trim() === name)
+    .forEach(f => normFairCategories(f.categories).split(',').filter(Boolean).forEach(k => keys.add(k)));
+  return normFairCategories(Array.from(keys));
+}
+
+// Variants of a model share their categories, so after any save the chosen
+// categories are copied onto every variant in the group.
+async function syncGroupCategories(model, categories) {
+  const group = fairItems.filter(f => (f.model || '').trim() === model);
+  if (group.length < 2 || group.every(f => normFairCategories(f.categories) === categories)) return;
+  await Sheets.fairSetCategories(CONFIG.fairSheet, [{ model, categories }]);
+  group.forEach(f => { f.categories = categories; });
 }
 
 function fairModelCount(name) {
@@ -883,6 +929,7 @@ function openFairModal(presetModel) {
     document.getElementById('fair-save-label').textContent = 'Save variant';
     modelInput.value = targetModel;
     modelInput.readOnly = true;
+    setFairCategoryChecks(fairGroupCategories(targetModel));
   } else {
     document.getElementById('fair-modal-title').textContent = 'Add model';
     document.getElementById('fair-save-label').textContent = 'Save model';
@@ -911,6 +958,7 @@ function openFairEdit(id) {
   document.getElementById('ff-public-name').value = f.publicName || '';
   document.getElementById('ff-public-credit').checked = !!f.publicCredit;
   document.getElementById('ff-hide-from-catalog').checked = !!f.hideFromCatalog;
+  setFairCategoryChecks(fairGroupCategories((f.model || '').trim()));
   const savedColors = parseFairColors(f);
   fairColorRows = savedColors.items;
   fairColorsQtyMode = savedColors.items.length ? savedColors.mode === 'qty' : fairIsVariantContext();
@@ -928,6 +976,7 @@ function clearFairForm() {
   document.getElementById('ff-license-status').value = 'need';
   document.getElementById('ff-public-credit').checked = false;
   document.getElementById('ff-hide-from-catalog').checked = false;
+  setFairCategoryChecks('');
   document.getElementById('fair-form-error').classList.add('hidden');
   fairColorRows = [];
   fairColorsQtyMode = fairIsVariantContext(); // sensible default; user can flip the toggle either way
@@ -1115,6 +1164,7 @@ async function saveFairItem() {
     publicName: document.getElementById('ff-public-name').value.trim(),
     publicCredit: document.getElementById('ff-public-credit').checked,
     hideFromCatalog: document.getElementById('ff-hide-from-catalog').checked,
+    categories: getFairCategoryChecks(),
     colors: cleanColors.length ? JSON.stringify({ mode: fairColorsQtyMode ? 'qty' : 'info', items: cleanColors }) : ''
   };
   let renameFrom = null;
@@ -1141,6 +1191,11 @@ async function saveFairItem() {
       const res = await Sheets.fairAppend(CONFIG.fairSheet, payload);
       fairItems.push({ ...payload, id: res.id, toSell: '', sold: '0' });
       showToast('Model added!', 'success');
+    }
+    try {
+      await syncGroupCategories(model, payload.categories);
+    } catch (syncErr) {
+      showToast("Saved, but couldn't update the other variants' categories.", 'error');
     }
     closeFairModal(); renderFair();
   } catch (e) {
