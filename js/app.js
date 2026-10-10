@@ -409,6 +409,7 @@ function calculateEstimate() {
 
 async function loadFairData() {
   setFairLoading();
+  loadFairCategories();
   try {
     await Promise.all([
       Sheets.fairEnsure(CONFIG.fairSheet).then(async () => { fairItems = await Sheets.fairRead(CONFIG.fairSheet); }),
@@ -467,8 +468,10 @@ function closeFairGroup() {
   renderFair();
 }
 
-// Public catalog categories — keep this list in sync with js/config.js in the catalog site.
-const FAIR_CATEGORIES = [
+// Public catalog categories. This is the fallback shown until the real list is
+// loaded from the "Fair Categories" tab (see loadFairCategories), which can be
+// edited from the model window.
+let FAIR_CATEGORIES = [
   { key: 'keychains', label: 'Keychains' },
   { key: 'jewelry', label: 'Jewelry' },
   { key: 'figurines', label: 'Figurines' },
@@ -477,8 +480,139 @@ const FAIR_CATEGORIES = [
 ];
 
 function buildFairCategoryChecks() {
-  document.getElementById('ff-categories').innerHTML = FAIR_CATEGORIES.map(c =>
-    `<label class="fair-qty-toggle-label"><input type="checkbox" value="${c.key}"> ${esc(c.label)}</label>`).join('');
+  const box = document.getElementById('ff-categories');
+  const keep = Array.from(box.querySelectorAll('input:checked')).map(el => el.value);
+  box.innerHTML = FAIR_CATEGORIES.map(c =>
+    `<label class="fair-qty-toggle-label"><input type="checkbox" value="${escAttr(c.key)}"> ${esc(c.label)}</label>`).join('');
+  setFairCategoryChecks(keep);
+}
+
+async function loadFairCategories() {
+  try {
+    await Sheets.categoriesEnsure();
+    const list = await Sheets.categoriesRead();
+    if (list.length) {
+      FAIR_CATEGORIES = list;
+      buildFairCategoryChecks();
+      renderCategoryManager();
+    }
+  } catch (e) {
+    // keep the built-in list; the model window still works
+  }
+}
+
+function insertFairCategory(cat) {
+  if (FAIR_CATEGORIES.some(c => c.key === cat.key)) return;
+  const misc = FAIR_CATEGORIES.filter(c => c.key === 'misc');
+  FAIR_CATEGORIES = FAIR_CATEGORIES.filter(c => c.key !== 'misc').concat([cat], misc);
+}
+
+function showNewCategoryInput() {
+  document.getElementById('ff-cat-new').classList.remove('hidden');
+  const input = document.getElementById('ff-cat-new-name');
+  input.value = '';
+  input.focus();
+}
+
+function hideNewCategoryInput() {
+  document.getElementById('ff-cat-new').classList.add('hidden');
+}
+
+// Creates the category right away and ticks it for the model being edited.
+async function addNewCategory() {
+  const input = document.getElementById('ff-cat-new-name');
+  const label = input.value.trim();
+  if (!label) return;
+  const btn = document.getElementById('ff-cat-new-btn');
+  btn.disabled = true;
+  try {
+    const res = await Sheets.categoriesCreate(label);
+    insertFairCategory({ key: res.key, label: res.label });
+    buildFairCategoryChecks();
+    setFairCategoryChecks(getFairCategoryChecks().split(',').concat(res.key));
+    renderCategoryManager();
+    hideNewCategoryInput();
+    showToast(res.existing ? `"${res.label}" already exists, ticked it for you.` : `Category "${res.label}" added.`, 'success');
+  } catch (e) {
+    showToast("Couldn't add the category: " + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Number of models (groups) currently using a category; models with none count as Misc.
+function fairCategoryUsage(key) {
+  const names = new Set(fairItems.map(f => (f.model || '').trim()));
+  let n = 0;
+  names.forEach(name => {
+    const cats = fairGroupCategories(name).split(',').filter(Boolean);
+    if (key === 'misc' ? (!cats.length || cats.includes('misc')) : cats.includes(key)) n++;
+  });
+  return n;
+}
+
+function openCategoryManager() {
+  renderCategoryManager();
+  document.getElementById('fair-cat-modal-overlay').classList.remove('hidden');
+}
+
+function closeCategoryManager() {
+  document.getElementById('fair-cat-modal-overlay').classList.add('hidden');
+}
+
+function renderCategoryManager() {
+  const list = document.getElementById('fair-cat-list');
+  list.innerHTML = FAIR_CATEGORIES.map(c => {
+    const n = fairCategoryUsage(c.key);
+    return `<div class="fair-cat-row">
+      <span class="fair-cat-name">${esc(c.label)}</span>
+      <span class="fair-cat-used">${n} model${n !== 1 ? 's' : ''}</span>
+      <button type="button" class="btn-edit" onclick="renameCategory('${escAttr(c.key)}')">Rename</button>
+      ${c.key === 'misc' ? '<span class="fair-cat-lock">catch-all</span>' : `<button type="button" class="btn-delete" onclick="deleteCategory('${escAttr(c.key)}')">Delete</button>`}
+    </div>`;
+  }).join('');
+}
+
+async function renameCategory(key) {
+  const cat = FAIR_CATEGORIES.find(c => c.key === key);
+  if (!cat) return;
+  const input = prompt('Rename category:', cat.label);
+  if (input === null) return;
+  const label = input.trim();
+  if (!label || label === cat.label) return;
+  if (FAIR_CATEGORIES.some(c => c.key !== key && c.label.toLowerCase() === label.toLowerCase())) {
+    showToast(`There's already a category called "${label}".`, 'error');
+    return;
+  }
+  try {
+    await Sheets.categoriesUpdate(key, label);
+    cat.label = label;
+    buildFairCategoryChecks();
+    renderCategoryManager();
+    showToast('Category renamed.', 'success');
+  } catch (e) {
+    showToast('Rename failed: ' + e.message, 'error');
+  }
+}
+
+async function deleteCategory(key) {
+  const cat = FAIR_CATEGORIES.find(c => c.key === key);
+  if (!cat || key === 'misc') return;
+  const n = fairCategoryUsage(key);
+  const used = n ? `
+
+${n} model${n !== 1 ? 's use' : ' uses'} it and will lose this category (models with no category show under Misc).` : '';
+  if (!confirm(`Delete the category "${cat.label}"?${used}`)) return;
+  try {
+    await Sheets.categoriesDelete(CONFIG.fairSheet, key);
+    FAIR_CATEGORIES = FAIR_CATEGORIES.filter(c => c.key !== key);
+    fairItems.forEach(f => { f.categories = normFairCategories(f.categories); });
+    buildFairCategoryChecks();
+    renderCategoryManager();
+    showToast('Category deleted.', 'success');
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
 }
 
 // Canonical form: known keys only, in list order, comma-separated.
