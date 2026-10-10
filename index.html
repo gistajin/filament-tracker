@@ -299,6 +299,15 @@
         <div class="form-row" style="grid-column:1/-1">
           <label>Catalog categories</label>
           <div id="ff-categories" class="fair-cat-checks"></div>
+          <div class="fair-cat-actions">
+            <button type="button" class="btn-ghost" onclick="showNewCategoryInput()">+ New category</button>
+            <button type="button" class="btn-ghost" onclick="openCategoryManager()">Manage</button>
+          </div>
+          <div id="ff-cat-new" class="fair-cat-new hidden">
+            <input id="ff-cat-new-name" placeholder="Category name, e.g. Ornaments" onkeydown="if (event.key === 'Enter') { event.preventDefault(); addNewCategory(); }">
+            <button type="button" class="btn-primary" id="ff-cat-new-btn" onclick="addNewCategory()">Add</button>
+            <button type="button" class="btn-ghost" onclick="hideNewCategoryInput()">Cancel</button>
+          </div>
           <span style="font-size:11px;color:var(--text-faint)">Pick any that apply. Applies to every variant of this model. No category counts as Misc on the public catalog.</span>
         </div>
         <div class="form-row">
@@ -336,6 +345,22 @@
     <div class="modal-footer">
       <button class="btn-ghost" onclick="closeFairModal()">Cancel</button>
       <button class="btn-primary" id="fair-save-btn" onclick="saveFairItem()"><span id="fair-save-label">Save model</span></button>
+    </div>
+  </div>
+</div>
+
+<div id="fair-cat-modal-overlay" class="modal-overlay hidden" onclick="if (event.target === this) closeCategoryManager()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Manage categories</h2>
+      <button class="modal-close" onclick="closeCategoryManager()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div id="fair-cat-list"></div>
+      <p class="fair-stock-hint" style="margin-top:12px;font-size:12px">Renaming only changes the label, so models keep their category. Deleting removes it from every model that uses it. Misc is the catch-all for models with no category and can't be deleted.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="closeCategoryManager()">Done</button>
     </div>
   </div>
 </div>
