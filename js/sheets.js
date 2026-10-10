@@ -102,6 +102,29 @@ const Sheets = {
     return this._call({ action: 'fairSetCategories', tab: sheetName, data: JSON.stringify({ items }) });
   },
 
+  // ---- Category list ----
+
+  async categoriesEnsure() {
+    return this._call({ action: 'categoriesEnsure' });
+  },
+
+  async categoriesRead() {
+    const rows = await this._call({ action: 'categoriesRead' });
+    return (Array.isArray(rows) ? rows : []).map(r => ({ key: String(r.key || ''), label: String(r.label || r.key || '') })).filter(r => r.key);
+  },
+
+  async categoriesCreate(label) {
+    return this._call({ action: 'categoriesCreate', data: JSON.stringify({ label }) });
+  },
+
+  async categoriesUpdate(key, label) {
+    return this._call({ action: 'categoriesUpdate', data: JSON.stringify({ key, label }) });
+  },
+
+  async categoriesDelete(modelsSheet, key) {
+    return this._call({ action: 'categoriesDelete', tab: modelsSheet, data: JSON.stringify({ key }) });
+  },
+
   // ---- Events ----
 
   async eventsEnsure(modelsSheetName) {
