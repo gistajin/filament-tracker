@@ -50,6 +50,7 @@ function toggleTheme() {
 window.addEventListener('DOMContentLoaded', () => {
   updateThemeIcons();
   buildFairCategoryChecks();
+  buildFilamentTypeOptions();
   if (!CONFIG.scriptUrl || CONFIG.scriptUrl === 'YOUR_SCRIPT_URL_HERE') {
     showSetupWarning();
     return;
@@ -103,10 +104,140 @@ function switchUser() {
   switchView('mine');
 }
 
+// ---- Filament types ----
+// The dropdown list is stored in the "Filament Types" tab and editable from the
+// add-spool window. This is the starting list, used until the sheet's list loads.
+
+let FILAMENT_TYPES = [
+  'PLA Basic', 'PLA Basic Gradient', 'PLA Matte', 'PLA Silk', 'PLA Silk+', 'PLA Silk Multi-Color',
+  'PLA-CF', 'PLA Tough+', 'PLA Translucent', 'PLA Metal', 'PLA Marble', 'PLA Galaxy',
+  'PLA Sparkle', 'PLA Glow', 'PLA Wood', 'PETG Basic', 'PETG HF', 'PETG-CF', 'PETG', 'ABS',
+  'TPU 95A HF', 'TPU 90A', 'TPU 85A', 'TPU', 'ASA', 'Other'
+];
+
+// A spool can carry a type that was later removed from the list; keep it
+// selectable in the form so editing that spool doesn't blank its type.
+function ensureTypeOption(type) {
+  const sel = document.getElementById('f-type');
+  if (!type || Array.from(sel.options).some(o => o.value === type)) return;
+  const opt = document.createElement('option');
+  opt.textContent = type;
+  sel.appendChild(opt);
+}
+
+function pruneTypeOptions() {
+  Array.from(document.getElementById('f-type').options).forEach(o => { if (!FILAMENT_TYPES.includes(o.value)) o.remove(); });
+}
+
+function buildFilamentTypeOptions() {
+  const formSel = document.getElementById('f-type');
+  const filterSel = document.getElementById('filter-type');
+  const keepForm = formSel.value;
+  const keepFilter = filterSel.value;
+  const opts = FILAMENT_TYPES.map(t => `<option>${esc(t)}</option>`).join('');
+  formSel.innerHTML = opts;
+  filterSel.innerHTML = '<option value="">All types</option>' + opts;
+  if (editingId) ensureTypeOption(keepForm);
+  formSel.value = keepForm && Array.from(formSel.options).some(o => o.value === keepForm) ? keepForm : FILAMENT_TYPES[0];
+  filterSel.value = FILAMENT_TYPES.includes(keepFilter) ? keepFilter : '';
+}
+
+async function loadFilamentTypes() {
+  try {
+    await Sheets.typesEnsure();
+    const list = await Sheets.typesRead();
+    if (list.length) {
+      FILAMENT_TYPES = list;
+      buildFilamentTypeOptions();
+      renderTypeManager();
+    }
+  } catch (e) {
+    // keep the built-in list; adding spools still works
+  }
+}
+
+function insertFilamentType(label) {
+  if (FILAMENT_TYPES.includes(label)) return;
+  const other = FILAMENT_TYPES.filter(t => t === 'Other');
+  FILAMENT_TYPES = FILAMENT_TYPES.filter(t => t !== 'Other').concat([label], other);
+}
+
+function showNewTypeInput() {
+  document.getElementById('f-type-new').classList.remove('hidden');
+  const input = document.getElementById('f-type-new-name');
+  input.value = '';
+  input.focus();
+}
+
+function hideNewTypeInput() {
+  document.getElementById('f-type-new').classList.add('hidden');
+}
+
+// Creates the type right away and selects it for the spool being edited.
+async function addNewType() {
+  const label = document.getElementById('f-type-new-name').value.trim();
+  if (!label) return;
+  const btn = document.getElementById('f-type-new-btn');
+  btn.disabled = true;
+  try {
+    const res = await Sheets.typesCreate(label);
+    insertFilamentType(res.label);
+    buildFilamentTypeOptions();
+    document.getElementById('f-type').value = res.label;
+    renderTypeManager();
+    hideNewTypeInput();
+    showToast(res.existing ? `"${res.label}" already exists, selected it for you.` : `Type "${res.label}" added.`, 'success');
+  } catch (e) {
+    showToast("Couldn't add the type: " + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function openTypeManager() {
+  renderTypeManager();
+  document.getElementById('type-modal-overlay').classList.remove('hidden');
+}
+
+function closeTypeManager() {
+  document.getElementById('type-modal-overlay').classList.add('hidden');
+}
+
+function renderTypeManager() {
+  document.getElementById('type-list').innerHTML = FILAMENT_TYPES.map((t, i) => {
+    const n = allFilaments.filter(f => f.type === t).length;
+    return `<div class="fair-cat-row">
+      <span class="fair-cat-name">${esc(t)}</span>
+      <span class="fair-cat-used">${n} spool${n !== 1 ? 's' : ''}</span>
+      ${t === 'Other' ? '<span class="fair-cat-lock">catch-all</span>' : `<button type="button" class="btn-delete" onclick="deleteTypeAt(${i})">Delete</button>`}
+    </div>`;
+  }).join('');
+}
+
+async function deleteTypeAt(i) {
+  const label = FILAMENT_TYPES[i];
+  if (!label || label === 'Other') return;
+  const n = allFilaments.filter(f => f.type === label).length;
+  const used = n ? `
+
+${n} spool${n !== 1 ? 's use' : ' uses'} it and will keep it. It just won't be in the dropdown for new spools.` : '';
+  if (!confirm(`Remove "${label}" from the list?${used}`)) return;
+  try {
+    await Sheets.typesDelete(label);
+    FILAMENT_TYPES = FILAMENT_TYPES.filter(t => t !== label);
+    buildFilamentTypeOptions();
+    renderTypeManager();
+    showToast('Type removed.', 'success');
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
 // ---- Data loading ----
 
 async function loadData() {
   setTableLoading(true);
+  loadFilamentTypes();
   try {
     await Sheets.ensureHeaders(activeUser.sheet);
     [allFilaments, appSettings] = await Promise.all([
@@ -1735,7 +1866,9 @@ function openEdit(id) {
   document.getElementById('modal-title').textContent = 'Edit spool';
   document.getElementById('save-label').textContent = 'Save changes';
   document.getElementById('f-brand').value = f.brand || '';
-  document.getElementById('f-type').value = f.type || 'PLA Basic';
+  pruneTypeOptions();
+  ensureTypeOption(f.type);
+  document.getElementById('f-type').value = f.type || FILAMENT_TYPES[0];
   document.getElementById('f-colorname').value = f.colorname || '';
   document.getElementById('f-color').value = f.color || '#cc0000';
   document.getElementById('f-qty').value = f.qty || '';
@@ -1760,9 +1893,11 @@ function clearForm() {
   ['brand','colorname','qty','weight','fullweight','nozzle','bed','speed','location','date','cost','trans','notes'].forEach(k => {
     document.getElementById('f-' + k).value = '';
   });
-  document.getElementById('f-type').value = 'PLA Basic';
+  pruneTypeOptions();
+  document.getElementById('f-type').value = FILAMENT_TYPES.includes('PLA Basic') ? 'PLA Basic' : FILAMENT_TYPES[0];
   document.getElementById('f-color').value = '#cc0000';
   document.getElementById('form-error').classList.add('hidden');
+  hideNewTypeInput();
 }
 
 // ---- Save / Delete ----
