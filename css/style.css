@@ -586,7 +586,19 @@ tr:hover td { background: var(--bg); }
   margin: 6px 0 4px;
 }
 
-.fair-cat-new input { flex: 1; width: auto; }
+.fair-cat-new input {
+  flex: 1;
+  width: auto;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-med);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+}
+
+.fair-cat-new input:focus { border-color: var(--accent); }
 
 .fair-cat-row {
   display: flex;
