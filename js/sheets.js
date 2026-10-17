@@ -125,6 +125,25 @@ const Sheets = {
     return this._call({ action: 'categoriesDelete', tab: modelsSheet, data: JSON.stringify({ key }) });
   },
 
+  // ---- Filament type list ----
+
+  async typesEnsure() {
+    return this._call({ action: 'typesEnsure' });
+  },
+
+  async typesRead() {
+    const rows = await this._call({ action: 'typesRead' });
+    return (Array.isArray(rows) ? rows : []).map(String).filter(Boolean);
+  },
+
+  async typesCreate(label) {
+    return this._call({ action: 'typesCreate', data: JSON.stringify({ label }) });
+  },
+
+  async typesDelete(label) {
+    return this._call({ action: 'typesDelete', data: JSON.stringify({ label }) });
+  },
+
   // ---- Events ----
 
   async eventsEnsure(modelsSheetName) {
