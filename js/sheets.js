@@ -78,7 +78,8 @@ const Sheets = {
       colors: String(r.colors || ''), sortOrder: String(r.sortOrder ?? '0'),
       photoFullUrl: String(r.photoFullUrl || ''), publicCredit: !!r.publicCredit,
       hideFromCatalog: !!r.hideFromCatalog, publicName: String(r.publicName || ''),
-      photoGallery: String(r.photoGallery || ''), categories: String(r.categories || '')
+      photoGallery: String(r.photoGallery || ''), categories: String(r.categories || ''),
+      notes: String(r.notes || '')
     })).filter(r => r.id);
   },
 
