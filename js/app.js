@@ -991,6 +991,40 @@ async function tagAllVariantsForEvent(model) {
   }
 }
 
+// Print time is stored in minutes and shown as "2h 35m"; weight is stored in grams.
+function setFairPrintTime(minutes) {
+  const total = parseInt(minutes);
+  const h = document.getElementById('ff-print-h');
+  const m = document.getElementById('ff-print-m');
+  if (isNaN(total)) { h.value = ''; m.value = ''; return; }
+  h.value = Math.floor(total / 60);
+  m.value = total % 60;
+}
+
+function getFairPrintMinutes() {
+  const h = document.getElementById('ff-print-h').value;
+  const m = document.getElementById('ff-print-m').value;
+  if (h === '' && m === '') return '';
+  return Math.max(0, Math.round((parseFloat(h) || 0) * 60 + (parseFloat(m) || 0)));
+}
+
+function getFairWeight() {
+  const w = document.getElementById('ff-weight').value;
+  return w === '' ? '' : Math.max(0, parseFloat(w) || 0);
+}
+
+function fairDurationLabel(minutes) {
+  const t = parseInt(minutes);
+  if (!(t > 0)) return '';
+  const h = Math.floor(t / 60), m = t % 60;
+  return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`;
+}
+
+function fairWeightLabel(grams) {
+  const n = parseFloat(grams);
+  return n > 0 ? `${+n.toFixed(1)} g` : '';
+}
+
 function fairCardHtml(f, isVariant) {
   const printed = parseInt(f.printed) || 0;
   const price = parseFloat(f.price) || 0;
@@ -1011,6 +1045,8 @@ function fairCardHtml(f, isVariant) {
         <div class="fair-card-row"><span>Stock</span><span>${printed}</span></div>
         ${fairColorChipsHtml(colors)}
         <div class="fair-card-row"><span>Price</span><span>${price ? '$' + price.toFixed(2) : '—'}</span></div>
+        ${fairDurationLabel(f.printMinutes) ? `<div class="fair-card-row"><span>Print time</span><span>${fairDurationLabel(f.printMinutes)}</span></div>` : ''}
+        ${fairWeightLabel(f.weightG) ? `<div class="fair-card-row"><span>Weight</span><span>${fairWeightLabel(f.weightG)}</span></div>` : ''}
         <div class="action-btns" style="margin-top:8px">
           <button class="btn-edit" onclick="openFairEdit('${f.id}')">Edit</button>
           <button class="btn-delete" onclick="deleteFairItem('${f.id}')">Delete</button>
@@ -1075,7 +1111,7 @@ function fairRowHtml(f, isVariant) {
   const tagged = curEvent ? isModelTagged(f.id, curEvent.id) : false;
   return `<tr data-model="${escAttr((f.model || '').trim())}">
       <td>${(f.photo || f.photoFullUrl) ? `<img src="${f.photo || f.photoFullUrl}" class="fair-thumb fair-photo-clickable" alt="" onclick="openFairLightboxFor('${escAttr(f.id)}')">` : `<div class="fair-thumb fair-thumb-empty"></div>`}</td>
-      <td><span style="font-weight:500">${esc(title)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}${fairColorChipsHtml(colors)}</td>
+      <td><span style="font-weight:500">${esc(title)}</span>${f.license ? `<span class="fair-list-note" title="${esc(f.license)}">${esc(f.license)}</span>` : ''}${fairColorChipsHtml(colors)}${[fairDurationLabel(f.printMinutes), fairWeightLabel(f.weightG)].filter(Boolean).length ? `<span class="fair-list-note">${[fairDurationLabel(f.printMinutes), fairWeightLabel(f.weightG)].filter(Boolean).join(' · ')}</span>` : ''}</td>
       <td><span class="fair-license-badge inline ${hasLicense ? 'has' : 'need'}">${hasLicense ? 'Licensed' : 'Need'}</span></td>
       <td>${printed}</td>
       <td>${price ? '$' + price.toFixed(2) : '—'}</td>
@@ -1222,6 +1258,8 @@ function openFairEdit(id) {
   document.getElementById('ff-photo-gallery').value = f.photoGallery || '';
   document.getElementById('ff-public-name').value = f.publicName || '';
   document.getElementById('ff-notes').value = f.notes || '';
+  setFairPrintTime(f.printMinutes);
+  document.getElementById('ff-weight').value = f.weightG || '';
   document.getElementById('ff-public-credit').checked = !!f.publicCredit;
   document.getElementById('ff-hide-from-catalog').checked = !!f.hideFromCatalog;
   setFairCategoryChecks(fairGroupCategories((f.model || '').trim()));
@@ -1238,7 +1276,7 @@ function closeFairModal() { document.getElementById('fair-modal-overlay').classL
 function handleFairOverlayClick(e) { if (e.target === document.getElementById('fair-modal-overlay')) closeFairModal(); }
 
 function clearFairForm() {
-  ['model', 'variant', 'license', 'printed', 'price', 'photo-full-url', 'photo-gallery', 'public-name', 'notes'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
+  ['model', 'variant', 'license', 'printed', 'price', 'photo-full-url', 'photo-gallery', 'public-name', 'notes', 'print-h', 'print-m', 'weight'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
   document.getElementById('ff-license-status').value = 'need';
   document.getElementById('ff-public-credit').checked = false;
   document.getElementById('ff-hide-from-catalog').checked = false;
@@ -1429,6 +1467,8 @@ async function saveFairItem() {
     photoGallery: document.getElementById('ff-photo-gallery').value.split('\n').map(s => s.trim()).filter(Boolean).join('\n'),
     publicName: document.getElementById('ff-public-name').value.trim(),
     notes: document.getElementById('ff-notes').value.trim(),
+    printMinutes: getFairPrintMinutes(),
+    weightG: getFairWeight(),
     publicCredit: document.getElementById('ff-public-credit').checked,
     hideFromCatalog: document.getElementById('ff-hide-from-catalog').checked,
     categories: getFairCategoryChecks(),
