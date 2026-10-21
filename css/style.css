@@ -600,6 +600,15 @@ tr:hover td { background: var(--bg); }
 
 .fair-cat-new input:focus { border-color: var(--accent); }
 
+.form-row .fair-time-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-row .fair-time-inputs input { width: 72px; }
+.fair-time-inputs span { font-size: 12px; color: var(--text-muted); }
+
 .fair-cat-row {
   display: flex;
   align-items: center;
