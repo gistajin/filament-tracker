@@ -79,7 +79,7 @@ const Sheets = {
       photoFullUrl: String(r.photoFullUrl || ''), publicCredit: !!r.publicCredit,
       hideFromCatalog: !!r.hideFromCatalog, publicName: String(r.publicName || ''),
       photoGallery: String(r.photoGallery || ''), categories: String(r.categories || ''),
-      notes: String(r.notes || '')
+      notes: String(r.notes || ''), printMinutes: String(r.printMinutes ?? ''), weightG: String(r.weightG ?? '')
     })).filter(r => r.id);
   },
 
