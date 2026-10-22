@@ -285,6 +285,7 @@ function switchView(view) {
   document.getElementById('search').placeholder = isFair ? 'Search models...' : 'Search color, type, location...';
   if (isEstimator) {
     renderEstimator();
+    if (!fairLoaded) loadFairData().then(populateEstimatorModels);
   } else if (isFair) {
     fairGroupFilter = null;
     if (fairLoaded) renderFair(); else loadFairData();
@@ -440,7 +441,71 @@ function renderEstimator() {
   document.getElementById('est-electricity-rate').textContent = '$' + (parseFloat(s.electricity_rate) || 0).toFixed(2);
   document.getElementById('est-tax-rate').textContent = (parseFloat(s.tax_rate) || 0).toFixed(2) + '%';
   document.getElementById('est-profit-margin').textContent = (parseFloat(s.profit_margin) || 0).toFixed(0) + '%';
+  populateEstimatorModels();
   renderEstimatorFilaments();
+  calculateEstimate();
+}
+
+// ---- Estimator: start from a saved model ----
+// Picking a model fills the print time and the filament rows (its "Filaments used"
+// list, matched to your spools by type + color name) and spreads its total weight
+// evenly across them. Filaments that can't be matched use your average cost per gram.
+
+let estimatorModelId = '';
+const EST_AVG_ID = '__avg__';
+
+function populateEstimatorModels() {
+  const sel = document.getElementById('est-model');
+  const items = fairItems
+    .filter(f => parseFloat(f.printMinutes) > 0 || parseFloat(f.weightG) > 0)
+    .map(f => ({ id: f.id, label: f.variant ? `${(f.model || '').trim()} — ${f.variant}` : (f.model || '').trim() }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  const empty = !fairLoaded ? 'Loading models...' : items.length ? 'Select a model...' : 'No models have a print time or weight yet';
+  sel.innerHTML = `<option value="">${empty}</option>` + items.map(i => `<option value="${escAttr(i.id)}">${esc(i.label)}</option>`).join('');
+  sel.value = items.some(i => i.id === estimatorModelId) ? estimatorModelId : '';
+  if (!sel.value) estimatorModelId = '';
+}
+
+function averageCostPerGram() {
+  const costs = allFilaments.map(f => parseFloat(f.cost)).filter(c => c > 0);
+  return costs.length ? costs.reduce((a, b) => a + b, 0) / costs.length / 1000 : 0;
+}
+
+function findSpoolByColorName(name) {
+  const key = String(name || '').trim().toLowerCase();
+  if (!key) return null;
+  return allFilaments.find(f => [f.type, f.colorname].filter(Boolean).join(' ').trim().toLowerCase() === key && parseFloat(f.cost) > 0) || null;
+}
+
+function applyEstimatorModel(id) {
+  estimatorModelId = id || '';
+  const hint = document.getElementById('est-model-hint');
+  const f = fairItems.find(x => x.id === id);
+  if (!f) { hint.classList.add('hidden'); calculateEstimate(); return; }
+
+  const minutes = parseFloat(f.printMinutes) || 0;
+  document.getElementById('est-hours').value = minutes > 0 ? Math.round(minutes / 60 * 100) / 100 : '';
+
+  const colors = parseFairColors(f).items.filter(c => c.name);
+  const total = parseFloat(f.weightG) || 0;
+  const rows = colors.length ? colors : (total > 0 ? [{ name: '' }] : []);
+  const share = rows.length && total > 0 ? Math.round(total / rows.length * 100) / 100 : '';
+  let estimated = 0;
+  estimatorFilaments = rows.map(c => {
+    const spool = findSpoolByColorName(c.name);
+    if (spool) return { filamentId: spool.id, weight: share };
+    estimated++;
+    return { filamentId: EST_AVG_ID, weight: share, label: c.name };
+  });
+  renderEstimatorFilaments();
+
+  const parts = [minutes > 0 ? `Print time ${fairDurationLabel(minutes)}` : 'No print time saved'];
+  parts.push(total > 0
+    ? `weight ${fairWeightLabel(total)}${rows.length > 1 ? ` split evenly across ${rows.length} filaments` : ''}`
+    : 'no weight saved');
+  if (estimated) parts.push(`${estimated} filament${estimated !== 1 ? 's' : ''} priced at your average cost per gram`);
+  hint.textContent = parts.join(' · ') + '.';
+  hint.classList.remove('hidden');
   calculateEstimate();
 }
 
@@ -453,7 +518,8 @@ function renderEstimatorFilaments() {
       .join('');
     return `<div class="est-filament-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
       <select style="flex:1;font-size:12px" onchange="updateEstFilament(${i},'filamentId',this.value);calculateEstimate()">
-        <option value="">Select filament...</option>${options}
+        <option value="">Select filament...</option>
+        <option value="${EST_AVG_ID}" ${ef.filamentId === EST_AVG_ID ? 'selected' : ''}>Average of my spools (estimate)</option>${options}
       </select>
       <input type="number" placeholder="Weight (g)" min="0" value="${ef.weight||''}" style="width:110px;font-size:12px"
         onchange="updateEstFilament(${i},'weight',this.value);calculateEstimate()"
@@ -478,6 +544,18 @@ function updateEstFilament(i, key, val) {
   estimatorFilaments[i][key] = val;
 }
 
+function priceCompareHtml(estimatedTotal, fmt) {
+  const model = estimatorModelId ? fairItems.find(f => f.id === estimatorModelId) : null;
+  if (!model) return '';
+  const listed = parseFloat(model.price) || 0;
+  if (!(listed > 0)) return `<div class="est-breakdown-row" style="color:var(--text-muted)"><span>No price set for this model in HQ</span><span></span></div>`;
+  const diff = listed - estimatedTotal;
+  const color = diff >= 0 ? 'var(--success-text)' : 'var(--danger-text)';
+  return `<div class="est-divider"></div>
+    <div class="est-breakdown-row"><span>Your price in HQ</span><span>${fmt(listed)}</span></div>
+    <div class="est-breakdown-row"><span>vs. estimated total</span><span style="color:${color}">${diff >= 0 ? '+' : '-'}${fmt(Math.abs(diff))}</span></div>`;
+}
+
 function calculateEstimate() {
   const hours = parseFloat(document.getElementById('est-hours').value) || 0;
   const s = appSettings;
@@ -490,8 +568,16 @@ function calculateEstimate() {
   let filamentCost = 0;
   let filamentDetails = [];
   estimatorFilaments.forEach(ef => {
-    const fil = allFilaments.find(f => f.id === ef.filamentId);
     const grams = parseFloat(ef.weight) || 0;
+    if (ef.filamentId === EST_AVG_ID) {
+      if (grams > 0) {
+        const cost = averageCostPerGram() * grams;
+        filamentCost += cost;
+        filamentDetails.push({ name: ef.label ? `${ef.label} (avg. cost)` : 'Average spool cost (estimate)', grams, cost });
+      }
+      return;
+    }
+    const fil = allFilaments.find(f => f.id === ef.filamentId);
     if (fil && grams > 0) {
       const costPerG = (parseFloat(fil.cost) || 0) / 1000;
       const cost = costPerG * grams;
@@ -532,6 +618,7 @@ function calculateEstimate() {
     <div class="est-breakdown-row"><span>Tax (${taxRate}%)</span><span>${fmt(tax)}</span></div>
     <div class="est-divider"></div>
     <div class="est-total-row"><span>Total price</span><span>${fmt(total)}</span></div>
+    ${priceCompareHtml(total, fmt)}
   `;
 }
 
