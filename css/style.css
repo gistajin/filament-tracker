@@ -905,6 +905,26 @@ tr:hover td { background: var(--bg); }
 
 .est-field input:focus { border-color: var(--accent); }
 
+.est-field select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-med);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+}
+
+.est-field select:focus { border-color: var(--accent); }
+
+.est-model-hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .est-rates-grid { display: flex; flex-direction: column; gap: 6px; }
 
 .est-rate-row {
