@@ -1115,10 +1115,15 @@ function getFairWeight() {
   return w === '' ? '' : Math.max(0, parseFloat(w) || 0);
 }
 
-// ---- Import print time & weight from a sliced file ----
-// Runs entirely in the browser. A .gcode.3mf is a zip whose Metadata/slice_info.config
-// lists every plate's estimated time and filament weight; a plain .gcode has the totals in
-// its header (Bambu/Orca) or footer (PrusaSlicer). Times and weights are summed across plates.
+// ---- Import print time & weight from sliced files ----
+// Runs entirely in the browser. A .gcode.3mf is a zip whose Metadata/slice_info.config lists every
+// plate's estimated time and filament weight; a plain .gcode has the totals in its header
+// (Bambu, Orca, Snapmaker Luban) or footer (PrusaSlicer, Orca). Several files can be added, e.g. one
+// section printed on a Snapmaker and another on a Bambu: the model's print time and weight are the
+// sum of everything in the list.
+
+let slicerImports = [];   // [{ key, name, plates, seconds, grams, filaments }]
+let slicerBackup = null;  // the form's time/weight before the first import, restored if all are removed
 
 async function readZipEntry(file, wanted) {
   if (typeof DecompressionStream === 'undefined') throw new Error("This browser can't read .3mf files. Use a current Chrome, Edge, Firefox or Safari.");
@@ -1187,56 +1192,127 @@ function parseGcodeText(text) {
   let seconds = 0, grams = 0, m;
   if ((m = text.match(/total estimated time:\s*([^\n;]+)/i))) seconds = parseDurationText(m[1]);
   else if ((m = text.match(/estimated printing time \(normal mode\)\s*=\s*([^\n]+)/i))) seconds = parseDurationText(m[1]);
+  else if ((m = text.match(/^;estimated_time\(s\):\s*([\d.]+)/m))) seconds = parseFloat(m[1]);
   else if ((m = text.match(/^;TIME:(\d+)/m))) seconds = parseInt(m[1]);
   if ((m = text.match(/total filament weight \[g\]\s*:\s*([\d.]+)/i))) grams = parseFloat(m[1]);
   else if ((m = text.match(/total filament used \[g\]\s*=\s*([\d.]+)/i))) grams = parseFloat(m[1]);
   return seconds || grams ? [{ seconds, grams, filaments: [] }] : [];
 }
 
-async function handleSlicerFile(event) {
-  const file = event.target.files[0];
+async function readSlicerFile(file) {
+  let plates;
+  if (/\.3mf$/i.test(file.name)) {
+    const xml = await readZipEntry(file, 'Metadata/slice_info.config');
+    if (!xml) throw new Error("This 3MF has no slice results. Slice it first and export the sliced file (.gcode.3mf).");
+    plates = parseSliceInfo(xml);
+  } else {
+    const head = await file.slice(0, 65536).text();
+    const tail = file.size > 65536 ? await file.slice(-65536).text() : '';
+    plates = parseGcodeText(head + '\n' + tail);
+  }
+  const seconds = plates.reduce((a, p) => a + p.seconds, 0);
+  const grams = Math.round(plates.reduce((a, p) => a + p.grams, 0) * 100) / 100;
+  if (!(seconds > 0) && !(grams > 0)) throw new Error("Couldn't find a print time or weight in this file.");
+  return { key: `${file.name}|${file.size}`, name: file.name, plates: plates.length, seconds, grams, filaments: plates.flatMap(p => p.filaments) };
+}
+
+async function handleSlicerFiles(event) {
+  const files = Array.from(event.target.files || []);
   event.target.value = '';
-  if (!file) return;
+  if (!files.length) return;
   const hint = document.getElementById('ff-slicer-hint');
   hint.style.color = '';
-  hint.textContent = 'Reading ' + file.name + '...';
-  try {
-    let plates;
-    if (/\.3mf$/i.test(file.name)) {
-      const xml = await readZipEntry(file, 'Metadata/slice_info.config');
-      if (!xml) throw new Error("This 3MF has no slice results. Slice it first and export the sliced file (.gcode.3mf).");
-      plates = parseSliceInfo(xml);
-    } else {
-      const head = await file.slice(0, 65536).text();
-      const tail = file.size > 65536 ? await file.slice(-65536).text() : '';
-      plates = parseGcodeText(head + '\n' + tail);
+  hint.textContent = files.length > 1 ? `Reading ${files.length} files...` : `Reading ${files[0].name}...`;
+  const problems = [];
+  for (const file of files) {
+    try {
+      const entry = await readSlicerFile(file);
+      if (slicerImports.some(s => s.key === entry.key)) { problems.push(`${file.name}: already added.`); continue; }
+      if (!slicerImports.length) {
+        slicerBackup = {
+          h: document.getElementById('ff-print-h').value,
+          m: document.getElementById('ff-print-m').value,
+          w: document.getElementById('ff-weight').value
+        };
+      }
+      slicerImports.push(entry);
+    } catch (e) {
+      problems.push(`${file.name}: ${e.message}`);
     }
-    const seconds = plates.reduce((a, p) => a + p.seconds, 0);
-    const grams = Math.round(plates.reduce((a, p) => a + p.grams, 0) * 100) / 100;
-    if (!(seconds > 0) && !(grams > 0)) throw new Error("Couldn't find a print time or weight in this file.");
-
-    const minutes = Math.round(seconds / 60);
-    if (seconds > 0) setFairPrintTime(minutes);
-    if (grams > 0) document.getElementById('ff-weight').value = grams;
-
-    const byFilament = {};
-    plates.forEach(p => p.filaments.forEach(f => {
-      const key = `${f.type} ${f.color}`.trim();
-      byFilament[key] = (byFilament[key] || 0) + f.grams;
-    }));
-    const parts = [];
-    if (plates.length > 1) parts.push(`${plates.length} plates`);
-    if (seconds > 0) parts.push(fairDurationLabel(minutes));
-    if (grams > 0) parts.push(fairWeightLabel(grams));
-    const filaments = Object.entries(byFilament).filter(([, g]) => g > 0).map(([k, g]) => `${k} ${+g.toFixed(1)} g`);
-    hint.textContent = `Imported from ${file.name}: ${parts.join(', ')}.`
-      + (filaments.length > 1 ? ` By filament: ${filaments.join(' · ')}.` : '')
-      + (seconds > 0 && !(grams > 0) ? ' No weight found in this file.' : '')
-      + (grams > 0 && !(seconds > 0) ? ' No print time found in this file.' : '');
-  } catch (e) {
-    hint.style.color = 'var(--danger-text)';
-    hint.textContent = e.message;
   }
+  hint.textContent = problems.join('\n');
+  hint.style.color = problems.length ? 'var(--danger-text)' : '';
+  applySlicerTotals();
+  renderSlicerImports();
+}
+
+function slicerTotals() {
+  return {
+    seconds: slicerImports.reduce((a, s) => a + s.seconds, 0),
+    grams: Math.round(slicerImports.reduce((a, s) => a + s.grams, 0) * 100) / 100
+  };
+}
+
+// The form shows the sum of the listed files; with nothing to sum it goes back to what it had before.
+function applySlicerTotals() {
+  const { seconds, grams } = slicerTotals();
+  const before = slicerBackup || { h: '', m: '', w: '' };
+  if (seconds > 0) {
+    setFairPrintTime(Math.round(seconds / 60));
+  } else {
+    document.getElementById('ff-print-h').value = before.h;
+    document.getElementById('ff-print-m').value = before.m;
+  }
+  document.getElementById('ff-weight').value = grams > 0 ? grams : before.w;
+  if (!slicerImports.length) slicerBackup = null;
+}
+
+function removeSlicerImport(i) {
+  slicerImports.splice(i, 1);
+  document.getElementById('ff-slicer-hint').textContent = '';
+  applySlicerTotals();
+  renderSlicerImports();
+}
+
+function resetSlicerImports() {
+  slicerImports = [];
+  slicerBackup = null;
+  document.getElementById('ff-slicer-hint').textContent = '';
+  renderSlicerImports();
+}
+
+function renderSlicerImports() {
+  const box = document.getElementById('ff-slicer-list');
+  if (!slicerImports.length) { box.innerHTML = ''; return; }
+  const meta = s => [
+    s.plates > 1 ? `${s.plates} plates` : '',
+    s.seconds > 0 ? fairDurationLabel(Math.round(s.seconds / 60)) : 'no time found',
+    s.grams > 0 ? fairWeightLabel(s.grams) : 'no weight found'
+  ].filter(Boolean).join(' · ');
+  const rows = slicerImports.map((s, i) => `<div class="slicer-row">
+      <span class="slicer-name" title="${escAttr(s.name)}">${esc(s.name)}</span>
+      <span class="slicer-meta">${meta(s)}</span>
+      <button type="button" class="btn-delete" title="Remove this file from the total" onclick="removeSlicerImport(${i})">&times;</button>
+    </div>`).join('');
+
+  const { seconds, grams } = slicerTotals();
+  const total = slicerImports.length > 1
+    ? `<div class="slicer-total"><span>Total</span><span>${[seconds > 0 ? fairDurationLabel(Math.round(seconds / 60)) : '', grams > 0 ? fairWeightLabel(grams) : ''].filter(Boolean).join(' · ')}</span></div>`
+    : '';
+
+  const notes = [];
+  const noWeight = slicerImports.filter(s => !(s.grams > 0)).length;
+  const noTime = slicerImports.filter(s => !(s.seconds > 0)).length;
+  if (noWeight) notes.push(`${noWeight} file${noWeight !== 1 ? 's have' : ' has'} no weight, so it isn't in the total. Add it in the weight box above.`);
+  if (noTime) notes.push(`${noTime} file${noTime !== 1 ? 's have' : ' has'} no print time, so it isn't in the total.`);
+  const byFilament = {};
+  slicerImports.forEach(s => s.filaments.forEach(f => {
+    const key = `${f.type} ${f.color}`.trim();
+    byFilament[key] = (byFilament[key] || 0) + f.grams;
+  }));
+  const filaments = Object.entries(byFilament).filter(([, g]) => g > 0).map(([k, g]) => `${k} ${+g.toFixed(1)} g`);
+  if (filaments.length > 1) notes.push(`By filament: ${filaments.join(' · ')}.`);
+  box.innerHTML = rows + total + notes.map(n => `<div class="est-model-hint">${esc(n)}</div>`).join('');
 }
 
 function fairDurationLabel(minutes) {
@@ -1486,7 +1562,7 @@ function openFairEdit(id) {
   document.getElementById('ff-notes').value = f.notes || '';
   setFairPrintTime(f.printMinutes);
   document.getElementById('ff-weight').value = f.weightG || '';
-  document.getElementById('ff-slicer-hint').textContent = '';
+  resetSlicerImports();
   document.getElementById('ff-public-credit').checked = !!f.publicCredit;
   document.getElementById('ff-hide-from-catalog').checked = !!f.hideFromCatalog;
   setFairCategoryChecks(fairGroupCategories((f.model || '').trim()));
@@ -1504,7 +1580,7 @@ function handleFairOverlayClick(e) { if (e.target === document.getElementById('f
 
 function clearFairForm() {
   ['model', 'variant', 'license', 'printed', 'price', 'photo-full-url', 'photo-gallery', 'public-name', 'notes', 'print-h', 'print-m', 'weight'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
-  document.getElementById('ff-slicer-hint').textContent = '';
+  resetSlicerImports();
   document.getElementById('ff-license-status').value = 'need';
   document.getElementById('ff-public-credit').checked = false;
   document.getElementById('ff-hide-from-catalog').checked = false;
