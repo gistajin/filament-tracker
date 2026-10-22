@@ -1898,6 +1898,14 @@ function renderEventsStats() {
     <div class="stat-card"><div class="stat-label">Projected total</div><div class="stat-val">$${(revenueSold + revenueProjected).toFixed(2)}</div></div>`;
 }
 
+// "Earned $15.00 / $30.00": money made so far (price x sold) out of what planned sales would bring in.
+function eventEarnedRow(earned, planned, hasPrice) {
+  const value = hasPrice
+    ? `<strong${earned > 0 ? ' style="color:var(--success-text)"' : ''}>$${earned.toFixed(2)}</strong> / $${planned.toFixed(2)}`
+    : '—';
+  return `<div class="fair-card-row"><span>Earned</span><span>${value}</span></div>`;
+}
+
 function eventCardHtml(f) {
   const printed = parseInt(f.printed) || 0;
   const toSell = parseInt(f.toSell) || 0;
@@ -1922,6 +1930,7 @@ function eventCardHtml(f) {
         <div class="fair-card-row"><span>To sell</span><span><input type="number" min="0" class="fair-inline-tosell" value="${toSell}" onchange="updateEventItemToSell('${f._eventItemId}',this.value)"></span></div>
         <div class="fair-card-row"><span>Price</span><span>${price ? '$' + price.toFixed(2) : '—'}</span></div>
         <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${toSell}</span></div>
+        ${eventEarnedRow(price * sold, price * toSell, price > 0)}
         <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
         <div class="fair-sold-row">
           <span>Sold: <strong>${sold}</strong></span>
@@ -1962,6 +1971,10 @@ function eventGroupCardHtml(g) {
         <div class="fair-card-row"><span>To sell</span><span>${totalToSell}</span></div>
         <div class="fair-card-row"><span>Price</span><span>${fairPriceLabel(items)}</span></div>
         <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${totalToSell}</span></div>
+        ${eventEarnedRow(
+          items.reduce((a, f) => a + (parseFloat(f.price) || 0) * (parseInt(f.sold) || 0), 0),
+          items.reduce((a, f) => a + (parseFloat(f.price) || 0) * (parseInt(f.toSell) || 0), 0),
+          items.some(f => parseFloat(f.price) > 0))}
         <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
         <div class="fair-group-hint">Click to view variants &rarr;</div>
       </div>
