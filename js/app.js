@@ -1115,6 +1115,130 @@ function getFairWeight() {
   return w === '' ? '' : Math.max(0, parseFloat(w) || 0);
 }
 
+// ---- Import print time & weight from a sliced file ----
+// Runs entirely in the browser. A .gcode.3mf is a zip whose Metadata/slice_info.config
+// lists every plate's estimated time and filament weight; a plain .gcode has the totals in
+// its header (Bambu/Orca) or footer (PrusaSlicer). Times and weights are summed across plates.
+
+async function readZipEntry(file, wanted) {
+  if (typeof DecompressionStream === 'undefined') throw new Error("This browser can't read .3mf files. Use a current Chrome, Edge, Firefox or Safari.");
+  const tailSize = Math.min(file.size, 65557);
+  const tail = new DataView(await file.slice(file.size - tailSize).arrayBuffer());
+  let eocd = -1;
+  for (let i = tailSize - 22; i >= 0; i--) {
+    if (tail.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("This doesn't look like a valid .3mf file.");
+  const count = tail.getUint16(eocd + 10, true);
+  const cdSize = tail.getUint32(eocd + 12, true);
+  const cdOffset = tail.getUint32(eocd + 16, true);
+  const cd = new DataView(await file.slice(cdOffset, cdOffset + cdSize).arrayBuffer());
+  const decoder = new TextDecoder();
+  let p = 0;
+  for (let n = 0; n < count && p + 46 <= cd.byteLength; n++) {
+    if (cd.getUint32(p, true) !== 0x02014b50) break;
+    const method = cd.getUint16(p + 10, true);
+    const compSize = cd.getUint32(p + 20, true);
+    const nameLen = cd.getUint16(p + 28, true);
+    const extraLen = cd.getUint16(p + 30, true);
+    const commentLen = cd.getUint16(p + 32, true);
+    const localOffset = cd.getUint32(p + 42, true);
+    const name = decoder.decode(new Uint8Array(cd.buffer, p + 46, nameLen));
+    if (name === wanted) {
+      const local = new DataView(await file.slice(localOffset, localOffset + 30).arrayBuffer());
+      const start = localOffset + 30 + local.getUint16(26, true) + local.getUint16(28, true);
+      const raw = file.slice(start, start + compSize);
+      if (method === 0) return raw.text();
+      if (method === 8) return new Response(raw.stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+      throw new Error('This .3mf uses a compression type I cannot read.');
+    }
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return null;
+}
+
+function parseSliceInfo(xmlText) {
+  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  return Array.from(doc.getElementsByTagName('plate')).map(plate => {
+    const meta = {};
+    Array.from(plate.children).filter(c => c.tagName === 'metadata').forEach(m => { meta[m.getAttribute('key')] = m.getAttribute('value'); });
+    return {
+      seconds: parseFloat(meta.prediction) || 0,
+      grams: parseFloat(meta.weight) || 0,
+      filaments: Array.from(plate.children).filter(c => c.tagName === 'filament').map(f => ({
+        type: f.getAttribute('type') || '',
+        color: (f.getAttribute('color') || '').slice(0, 7),
+        grams: parseFloat(f.getAttribute('used_g')) || 0
+      }))
+    };
+  });
+}
+
+function parseDurationText(txt) {
+  let total = 0, found = false;
+  String(txt || '').replace(/(\d+(?:\.\d+)?)\s*([dhms])/gi, (_, v, u) => {
+    found = true;
+    total += parseFloat(v) * { d: 86400, h: 3600, m: 60, s: 1 }[u.toLowerCase()];
+  });
+  return found ? total : 0;
+}
+
+function parseGcodeText(text) {
+  let seconds = 0, grams = 0, m;
+  if ((m = text.match(/total estimated time:\s*([^\n;]+)/i))) seconds = parseDurationText(m[1]);
+  else if ((m = text.match(/estimated printing time \(normal mode\)\s*=\s*([^\n]+)/i))) seconds = parseDurationText(m[1]);
+  else if ((m = text.match(/^;TIME:(\d+)/m))) seconds = parseInt(m[1]);
+  if ((m = text.match(/total filament weight \[g\]\s*:\s*([\d.]+)/i))) grams = parseFloat(m[1]);
+  else if ((m = text.match(/total filament used \[g\]\s*=\s*([\d.]+)/i))) grams = parseFloat(m[1]);
+  return seconds || grams ? [{ seconds, grams, filaments: [] }] : [];
+}
+
+async function handleSlicerFile(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  const hint = document.getElementById('ff-slicer-hint');
+  hint.style.color = '';
+  hint.textContent = 'Reading ' + file.name + '...';
+  try {
+    let plates;
+    if (/\.3mf$/i.test(file.name)) {
+      const xml = await readZipEntry(file, 'Metadata/slice_info.config');
+      if (!xml) throw new Error("This 3MF has no slice results. Slice it first and export the sliced file (.gcode.3mf).");
+      plates = parseSliceInfo(xml);
+    } else {
+      const head = await file.slice(0, 65536).text();
+      const tail = file.size > 65536 ? await file.slice(-65536).text() : '';
+      plates = parseGcodeText(head + '\n' + tail);
+    }
+    const seconds = plates.reduce((a, p) => a + p.seconds, 0);
+    const grams = Math.round(plates.reduce((a, p) => a + p.grams, 0) * 100) / 100;
+    if (!(seconds > 0) && !(grams > 0)) throw new Error("Couldn't find a print time or weight in this file.");
+
+    const minutes = Math.round(seconds / 60);
+    if (seconds > 0) setFairPrintTime(minutes);
+    if (grams > 0) document.getElementById('ff-weight').value = grams;
+
+    const byFilament = {};
+    plates.forEach(p => p.filaments.forEach(f => {
+      const key = `${f.type} ${f.color}`.trim();
+      byFilament[key] = (byFilament[key] || 0) + f.grams;
+    }));
+    const parts = [];
+    if (plates.length > 1) parts.push(`${plates.length} plates`);
+    if (seconds > 0) parts.push(fairDurationLabel(minutes));
+    if (grams > 0) parts.push(fairWeightLabel(grams));
+    const filaments = Object.entries(byFilament).filter(([, g]) => g > 0).map(([k, g]) => `${k} ${+g.toFixed(1)} g`);
+    hint.textContent = `Imported from ${file.name}: ${parts.join(', ')}.`
+      + (filaments.length > 1 ? ` By filament: ${filaments.join(' · ')}.` : '')
+      + (seconds > 0 && !(grams > 0) ? ' No weight found in this file.' : '')
+      + (grams > 0 && !(seconds > 0) ? ' No print time found in this file.' : '');
+  } catch (e) {
+    hint.style.color = 'var(--danger-text)';
+    hint.textContent = e.message;
+  }
+}
+
 function fairDurationLabel(minutes) {
   const t = parseInt(minutes);
   if (!(t > 0)) return '';
@@ -1362,6 +1486,7 @@ function openFairEdit(id) {
   document.getElementById('ff-notes').value = f.notes || '';
   setFairPrintTime(f.printMinutes);
   document.getElementById('ff-weight').value = f.weightG || '';
+  document.getElementById('ff-slicer-hint').textContent = '';
   document.getElementById('ff-public-credit').checked = !!f.publicCredit;
   document.getElementById('ff-hide-from-catalog').checked = !!f.hideFromCatalog;
   setFairCategoryChecks(fairGroupCategories((f.model || '').trim()));
@@ -1379,6 +1504,7 @@ function handleFairOverlayClick(e) { if (e.target === document.getElementById('f
 
 function clearFairForm() {
   ['model', 'variant', 'license', 'printed', 'price', 'photo-full-url', 'photo-gallery', 'public-name', 'notes', 'print-h', 'print-m', 'weight'].forEach(k => { document.getElementById('ff-' + k).value = ''; });
+  document.getElementById('ff-slicer-hint').textContent = '';
   document.getElementById('ff-license-status').value = 'need';
   document.getElementById('ff-public-credit').checked = false;
   document.getElementById('ff-hide-from-catalog').checked = false;
