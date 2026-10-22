@@ -285,7 +285,7 @@ function switchView(view) {
   document.getElementById('search').placeholder = isFair ? 'Search models...' : 'Search color, type, location...';
   if (isEstimator) {
     renderEstimator();
-    if (!fairLoaded) loadFairData().then(populateEstimatorModels);
+    if (!fairLoaded && !estimatorModelsLoaded) loadEstimatorModels().then(populateEstimatorModels);
   } else if (isFair) {
     fairGroupFilter = null;
     if (fairLoaded) renderFair(); else loadFairData();
@@ -452,7 +452,20 @@ function renderEstimator() {
 // evenly across them. Filaments that can't be matched use your average cost per gram.
 
 let estimatorModelId = '';
+let estimatorModelsLoaded = false;
 const EST_AVG_ID = '__avg__';
+
+// Reads only the models (not events/categories) so the dropdown fills quickly.
+// fairLoaded stays false, so opening Models later still does its full load.
+async function loadEstimatorModels() {
+  try {
+    await Sheets.fairEnsure(CONFIG.fairSheet);
+    fairItems = await Sheets.fairRead(CONFIG.fairSheet);
+  } catch (e) {
+    showToast("Couldn't load your models: " + e.message, 'error');
+  }
+  estimatorModelsLoaded = true;
+}
 
 function populateEstimatorModels() {
   const sel = document.getElementById('est-model');
@@ -460,7 +473,9 @@ function populateEstimatorModels() {
     .filter(f => parseFloat(f.printMinutes) > 0 || parseFloat(f.weightG) > 0)
     .map(f => ({ id: f.id, label: f.variant ? `${(f.model || '').trim()} — ${f.variant}` : (f.model || '').trim() }))
     .sort((a, b) => a.label.localeCompare(b.label));
-  const empty = !fairLoaded ? 'Loading models...' : items.length ? 'Select a model...' : 'No models have a print time or weight yet';
+  const loading = !fairLoaded && !estimatorModelsLoaded;
+  const empty = loading ? 'Loading models...' : items.length ? 'Select a model...' : 'No models have a print time or weight yet';
+  sel.disabled = loading;
   sel.innerHTML = `<option value="">${empty}</option>` + items.map(i => `<option value="${escAttr(i.id)}">${esc(i.label)}</option>`).join('');
   sel.value = items.some(i => i.id === estimatorModelId) ? estimatorModelId : '';
   if (!sel.value) estimatorModelId = '';
