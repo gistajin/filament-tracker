@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>3D YEEHAW HQ</title>
-  <link rel="stylesheet" href="css/style.css?v=2026-10-22b">
+  <link rel="stylesheet" href="css/style.css?v=2026-10-22c">
   <script>
     (function() {
       try {
@@ -336,9 +336,10 @@
           <input type="number" id="ff-weight" min="0" step="0.1" placeholder="e.g. 48">
         </div>
         <div class="form-row" style="grid-column:1/-1">
-          <button type="button" class="btn-ghost" style="align-self:flex-start" onclick="document.getElementById('ff-slicer-file').click()">Import time &amp; weight from a slicer file...</button>
-          <input type="file" id="ff-slicer-file" accept=".3mf,.gcode" class="hidden" onchange="handleSlicerFile(event)">
-          <span id="ff-slicer-hint" class="est-model-hint"></span>
+          <button type="button" class="btn-ghost" style="align-self:flex-start" onclick="document.getElementById('ff-slicer-file').click()">Import time &amp; weight from slicer files...</button>
+          <input type="file" id="ff-slicer-file" accept=".3mf,.gcode" multiple class="hidden" onchange="handleSlicerFiles(event)">
+          <div id="ff-slicer-list" class="slicer-list"></div>
+          <span id="ff-slicer-hint" class="est-model-hint" style="white-space:pre-line"></span>
         </div>
         <div class="form-row" style="grid-column:1/-1">
           <label id="ff-colors-label">Colors &amp; quantities (optional)</label>
@@ -429,8 +430,8 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
-<script src="js/config.js?v=2026-10-22b"></script>
-<script src="js/sheets.js?v=2026-10-22b"></script>
-<script src="js/app.js?v=2026-10-22b"></script>
+<script src="js/config.js?v=2026-10-22c"></script>
+<script src="js/sheets.js?v=2026-10-22c"></script>
+<script src="js/app.js?v=2026-10-22c"></script>
 </body>
 </html>
