@@ -918,6 +918,29 @@ tr:hover td { background: var(--bg); }
 
 .est-field select:focus { border-color: var(--accent); }
 
+.slicer-list { margin-top: 6px; }
+
+.slicer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 0.5px solid var(--border);
+  font-size: 12px;
+}
+
+.slicer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slicer-meta { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.slicer-row .btn-delete { padding: 2px 8px; font-size: 13px; line-height: 1.2; }
+
+.slicer-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .est-model-hint {
   display: block;
   margin-top: 5px;
