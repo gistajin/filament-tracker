@@ -1881,42 +1881,34 @@ function selectEvent(id) {
 
 function renderEventsStats() {
   const items = eventItems.filter(ei => ei.eventId === currentEventSelectId);
-  const totalToSell = items.reduce((a, ei) => a + (parseInt(ei.toSell) || 0), 0);
   const totalSold = items.reduce((a, ei) => a + (parseInt(ei.sold) || 0), 0);
-  let revenueSold = 0, revenueProjected = 0;
+  let revenueSold = 0;
   items.forEach(ei => {
     const model = fairItems.find(f => f.id === ei.modelId);
     const price = model ? parseFloat(model.price) || 0 : 0;
     revenueSold += price * (parseInt(ei.sold) || 0);
-    revenueProjected += price * Math.max((parseInt(ei.toSell) || 0) - (parseInt(ei.sold) || 0), 0);
   });
   document.getElementById('events-stats-row').innerHTML = `
     <div class="stat-card"><div class="stat-label">Tagged models</div><div class="stat-val">${items.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Planned to sell</div><div class="stat-val">${totalToSell}</div></div>
     <div class="stat-card"><div class="stat-label">Sold</div><div class="stat-val">${totalSold}</div></div>
-    <div class="stat-card"><div class="stat-label">Revenue so far</div><div class="stat-val">$${revenueSold.toFixed(2)}</div></div>
-    <div class="stat-card"><div class="stat-label">Projected total</div><div class="stat-val">$${(revenueSold + revenueProjected).toFixed(2)}</div></div>`;
+    <div class="stat-card"><div class="stat-label">Revenue so far</div><div class="stat-val">$${revenueSold.toFixed(2)}</div></div>`;
 }
 
-// "Earned $15.00 / $30.00": money made so far (price x sold) out of what planned sales would bring in.
-function eventEarnedRow(earned, planned, hasPrice) {
+// "Earned $15.00": money made so far at this event (price x sold).
+function eventEarnedRow(earned, hasPrice) {
   const value = hasPrice
-    ? `<strong${earned > 0 ? ' style="color:var(--success-text)"' : ''}>$${earned.toFixed(2)}</strong> / $${planned.toFixed(2)}`
+    ? `<strong${earned > 0 ? ' style="color:var(--success-text)"' : ''}>$${earned.toFixed(2)}</strong>`
     : '—';
   return `<div class="fair-card-row"><span>Earned</span><span>${value}</span></div>`;
 }
 
 function eventCardHtml(f) {
   const printed = parseInt(f.printed) || 0;
-  const toSell = parseInt(f.toSell) || 0;
   const sold = parseInt(f.sold) || 0;
-  const remaining = Math.max(toSell - sold, 0);
   const price = parseFloat(f.price) || 0;
-  const pct = toSell > 0 ? Math.min(Math.round((sold / toSell) * 100), 100) : 0;
   const hasLicense = f.licenseStatus === 'have';
   const title = f._isVariant ? (f.variant || f.model) : f.model;
   const colors = parseFairColors(f);
-  const shortOnStock = toSell > 0 && printed < toSell;
   return `<div class="fair-card">
       <div class="fair-card-photo">
         ${(f.photo || f.photoFullUrl) ? `<img src="${f.photo || f.photoFullUrl}" alt="" class="fair-photo-clickable" onclick="openFairLightboxFor('${escAttr(f.id)}')">` : `<div class="fair-card-noimg">No photo</div>`}
@@ -1926,12 +1918,9 @@ function eventCardHtml(f) {
         <div class="fair-card-title">${esc(title)}</div>
         ${f.model !== title ? `<div class="fair-card-license">${esc(f.model)}</div>` : ''}
         ${fairColorChipsHtml(colors)}
-        <div class="fair-card-row"><span>Stock</span><span class="${shortOnStock ? 'fair-stock-warning' : ''}">${printed}${shortOnStock ? ' (short)' : ''}</span></div>
-        <div class="fair-card-row"><span>To sell</span><span><input type="number" min="0" class="fair-inline-tosell" value="${toSell}" onchange="updateEventItemToSell('${f._eventItemId}',this.value)"></span></div>
+        <div class="fair-card-row"><span>Stock left</span><span>${printed}</span></div>
         <div class="fair-card-row"><span>Price</span><span>${price ? '$' + price.toFixed(2) : '—'}</span></div>
-        <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${toSell}</span></div>
-        ${eventEarnedRow(price * sold, price * toSell, price > 0)}
-        <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
+        ${eventEarnedRow(price * sold, price > 0)}
         <div class="fair-sold-row">
           <span>Sold: <strong>${sold}</strong></span>
           <div class="fair-sold-btns">
@@ -1948,17 +1937,11 @@ function eventGroupCardHtml(g) {
   const items = g.items;
   const photoItem = items.find(f => f.photo || f.photoFullUrl);
   const totalPrinted = items.reduce((a, f) => a + (parseInt(f.printed) || 0), 0);
-  const totalToSell = items.reduce((a, f) => a + (parseInt(f.toSell) || 0), 0);
   const totalSold = items.reduce((a, f) => a + (parseInt(f.sold) || 0), 0);
-  const remaining = Math.max(totalToSell - totalSold, 0);
-  const pct = totalToSell > 0 ? Math.min(Math.round((totalSold / totalToSell) * 100), 100) : 0;
   const allHave = items.every(f => f.licenseStatus === 'have');
   const anyHave = items.some(f => f.licenseStatus === 'have');
   const badgeClass = allHave ? 'has' : (anyHave ? 'mixed' : 'need');
   const badgeText = allHave ? 'Licensed' : (anyHave ? 'Mixed' : 'Need license');
-  // Flag per-variant shortfalls, not just the total — a surplus in one
-  // variant can otherwise mask a shortage in another.
-  const anyShort = items.some(f => (parseInt(f.toSell) || 0) > 0 && (parseInt(f.printed) || 0) < (parseInt(f.toSell) || 0));
   return `<div class="fair-card fair-group-card" onclick="openEventGroup('${esc(g.model).replace(/'/g, "\\'")}')">
       <div class="fair-card-photo">
         ${photoItem ? `<img src="${photoItem.photo || photoItem.photoFullUrl}" alt="">` : `<div class="fair-card-noimg">No photo</div>`}
@@ -1967,15 +1950,12 @@ function eventGroupCardHtml(g) {
       </div>
       <div class="fair-card-body">
         <div class="fair-card-title">${esc(g.model)}</div>
-        <div class="fair-card-row"><span>Stock</span><span class="${anyShort ? 'fair-stock-warning' : ''}">${totalPrinted}${anyShort ? ' (a variant is short)' : ''}</span></div>
-        <div class="fair-card-row"><span>To sell</span><span>${totalToSell}</span></div>
+        <div class="fair-card-row"><span>Stock left</span><span>${totalPrinted}</span></div>
         <div class="fair-card-row"><span>Price</span><span>${fairPriceLabel(items)}</span></div>
-        <div class="fair-card-row"><span>Remaining</span><span>${remaining} / ${totalToSell}</span></div>
+        <div class="fair-card-row"><span>Sold</span><span><strong>${totalSold}</strong></span></div>
         ${eventEarnedRow(
           items.reduce((a, f) => a + (parseFloat(f.price) || 0) * (parseInt(f.sold) || 0), 0),
-          items.reduce((a, f) => a + (parseFloat(f.price) || 0) * (parseInt(f.toSell) || 0), 0),
           items.some(f => parseFloat(f.price) > 0))}
-        <div class="fair-progress"><div class="fair-progress-fill" style="width:${pct}%"></div></div>
         <div class="fair-group-hint">Click to view variants &rarr;</div>
       </div>
     </div>`;
@@ -2033,7 +2013,7 @@ function renderEvents() {
   let merged = items.map(ei => {
     const model = fairItems.find(f => f.id === ei.modelId);
     if (!model) return null;
-    return { ...model, toSell: ei.toSell, sold: ei.sold, _eventItemId: ei.id, _isVariant: !!(model.variant && model.variant.trim()) };
+    return { ...model, sold: ei.sold, _eventItemId: ei.id, _isVariant: !!(model.variant && model.variant.trim()) };
   }).filter(Boolean).sort((a, b) => (parseFloat(a.sortOrder) || 0) - (parseFloat(b.sortOrder) || 0));
 
   if (eventGroupFilter !== null) {
@@ -2054,33 +2034,91 @@ function renderEvents() {
   grid.innerHTML = groups.map(g => g.items.length > 1 ? eventGroupCardHtml(g) : eventCardHtml(g.items[0])).join('');
 }
 
-async function bumpEventSold(eventItemId, delta) {
+// A sale (+1) takes one piece out of the model's Stock and an undo (-1) puts it back, so Stock
+// stays correct across every event. Models whose Stock is the sum of per-color counts ask which
+// color the piece was, since that is the number that has to change.
+let eventSellInflight = 0;
+let eventColorPick = null; // { eventItemId, delta }
+
+function bumpEventSold(eventItemId, delta) {
   const item = eventItems.find(ei => ei.id === eventItemId); if (!item) return;
-  const prev = item.sold;
-  const newSold = Math.max((parseInt(item.sold) || 0) + delta, 0);
-  item.sold = String(newSold);
-  renderEvents();
-  try {
-    await Sheets.eventItemUpsert({ id: eventItemId, sold: newSold });
-  } catch (e) {
-    item.sold = prev;
-    renderEvents();
-    showToast('Failed to update sold count: ' + e.message, 'error');
+  if (delta < 0 && !(parseInt(item.sold) || 0)) return;
+  const model = fairItems.find(f => f.id === item.modelId); if (!model) return;
+  const colors = parseFairColors(model);
+  if (colors.mode === 'qty' && colors.items.length) {
+    openEventColorPicker(eventItemId, delta, model, colors);
+    return;
+  }
+  commitEventSale(item, model, delta, null);
+}
+
+// Applies one sale/undo to the local copies of the event item and the model.
+// Used for the instant update and, with the opposite delta, to roll it back.
+function applyEventSaleLocal(item, model, delta, colorIndex) {
+  item.sold = String(Math.max((parseInt(item.sold) || 0) + delta, 0));
+  const colors = parseFairColors(model);
+  if (colorIndex !== null && colors.mode === 'qty' && colors.items[colorIndex]) {
+    colors.items[colorIndex].qty = Math.max((parseInt(colors.items[colorIndex].qty) || 0) - delta, 0);
+    model.colors = JSON.stringify({ mode: 'qty', items: colors.items });
+    model.printed = String(colors.items.reduce((a, c) => a + (parseInt(c.qty) || 0), 0));
+  } else {
+    model.printed = String(Math.max((parseInt(model.printed) || 0) - delta, 0));
   }
 }
 
-async function updateEventItemToSell(eventItemId, val) {
-  const item = eventItems.find(ei => ei.id === eventItemId); if (!item) return;
-  const prev = item.toSell;
-  item.toSell = String(parseInt(val) || 0);
+async function commitEventSale(item, model, delta, colorIndex) {
+  applyEventSaleLocal(item, model, delta, colorIndex);
   renderEvents();
+  if (fairLoaded) renderFair();
+  eventSellInflight++;
   try {
-    await Sheets.eventItemUpsert({ id: eventItemId, toSell: item.toSell });
+    const res = await Sheets.eventItemSell(CONFIG.fairSheet, item.id, delta, colorIndex === null ? '' : colorIndex);
+    eventSellInflight--;
+    // Only trust the server's numbers once the last tap has landed; an earlier reply
+    // would briefly show a count that doesn't include the taps still in flight.
+    if (!eventSellInflight && res) {
+      item.sold = String(res.sold);
+      model.printed = String(res.printed);
+      if (res.colors) model.colors = res.colors;
+      renderEvents();
+      if (fairLoaded) renderFair();
+    }
   } catch (e) {
-    item.toSell = prev;
+    eventSellInflight--;
+    applyEventSaleLocal(item, model, -delta, colorIndex);
     renderEvents();
-    showToast('Failed to update: ' + e.message, 'error');
+    if (fairLoaded) renderFair();
+    showToast('Failed to save sale: ' + e.message, 'error');
   }
+}
+
+function openEventColorPicker(eventItemId, delta, model, colors) {
+  eventColorPick = { eventItemId, delta };
+  document.getElementById('event-color-title').textContent = delta > 0 ? 'Which color sold?' : 'Which color goes back to stock?';
+  document.getElementById('event-color-list').innerHTML = colors.items.map((c, i) => `
+    <button class="btn-ghost event-color-btn" onclick="pickEventColor(${i})">
+      <span class="fair-color-dot" style="background:${c.hex || '#ccc'}"></span>
+      <span class="event-color-name">${esc(c.name || 'Color ' + (i + 1))}</span>
+      <span class="event-color-qty">${parseInt(c.qty) || 0} in stock</span>
+    </button>`).join('');
+  document.getElementById('event-color-overlay').classList.remove('hidden');
+}
+
+function closeEventColorPicker() {
+  eventColorPick = null;
+  document.getElementById('event-color-overlay').classList.add('hidden');
+}
+
+function handleEventColorOverlayClick(e) {
+  if (e.target === document.getElementById('event-color-overlay')) closeEventColorPicker();
+}
+
+function pickEventColor(colorIndex) {
+  const pick = eventColorPick; if (!pick) return;
+  closeEventColorPicker();
+  const item = eventItems.find(ei => ei.id === pick.eventItemId); if (!item) return;
+  const model = fairItems.find(f => f.id === item.modelId); if (!model) return;
+  commitEventSale(item, model, pick.delta, colorIndex);
 }
 
 async function untagEventItem(eventItemId) {
@@ -2172,8 +2210,8 @@ async function submitEventModal() {
       if (prevEvent) {
         const prevItems = eventItems.filter(ei => ei.eventId === prevEvent.id);
         const created = await Promise.all(prevItems.map(item =>
-          Sheets.eventItemUpsert({ eventId: newEventId, modelId: item.modelId, toSell: item.toSell, sold: '0' })
-            .then(r => ({ id: r.id, eventId: newEventId, modelId: item.modelId, toSell: item.toSell, sold: '0' }))
+          Sheets.eventItemUpsert({ eventId: newEventId, modelId: item.modelId, toSell: '0', sold: '0' })
+            .then(r => ({ id: r.id, eventId: newEventId, modelId: item.modelId, toSell: '0', sold: '0' }))
         ));
         eventItems.push(...created);
       }
