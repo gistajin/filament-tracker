@@ -1114,15 +1114,29 @@ tr:hover td { background: var(--bg); }
   font-weight: 600;
 }
 
-.fair-inline-tosell {
-  width: 60px;
-  padding: 3px 6px;
+.event-color-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-color-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+}
+
+.event-color-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.event-color-qty {
   font-size: 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-med);
-  text-align: right;
-  background: var(--surface);
-  color: var(--text);
+  opacity: 0.7;
 }
 
 .fair-license-badge {
