@@ -183,6 +183,10 @@ const Sheets = {
     return this._call({ action: 'eventItemUpsert', data: JSON.stringify(payload) });
   },
 
+  async eventItemSell(modelsSheet, id, delta, colorIndex) {
+    return this._call({ action: 'eventItemSell', tab: modelsSheet, data: JSON.stringify({ id, delta, colorIndex }) });
+  },
+
   async eventItemDelete(id) {
     return this._call({ action: 'eventItemDelete', data: JSON.stringify({ id }) });
   }
