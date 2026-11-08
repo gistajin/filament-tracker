@@ -265,6 +265,23 @@ function switchView(view) {
   const isEstimator = view === 'estimator';
   const isFair = view === 'fair';
   const isEvents = view === 'events';
+  const isPapel = view === 'papel';
+  // The papel picado studio is a full page of its own: it gets the whole width and none of the toolbar.
+  document.getElementById('papel-view').classList.toggle('hidden', !isPapel);
+  document.getElementById('main-toolbar').classList.toggle('hidden', isPapel);
+  document.querySelector('main').classList.toggle('main-tool', isPapel);
+  if (isPapel) {
+    const frame = document.getElementById('papel-frame');
+    if (!frame.getAttribute('src')) frame.setAttribute('src', 'papel-picado/index.html?v=2026-11-08a');
+    document.querySelector('.display-toggle').style.display = 'none';
+    document.getElementById('stats-row').classList.add('hidden');
+    document.getElementById('table-view').classList.add('hidden');
+    document.getElementById('gallery-view').classList.add('hidden');
+    document.getElementById('fair-view').classList.add('hidden');
+    document.getElementById('events-view').classList.add('hidden');
+    document.getElementById('estimator-view').classList.add('hidden');
+    return;
+  }
   addBtn.style.display = (view === 'mine') ? '' : 'none';
   addFairBtn.classList.toggle('hidden', !isFair);
   eventSelect.classList.toggle('hidden', !isEvents);
