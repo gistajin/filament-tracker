@@ -500,7 +500,7 @@ main { position: relative; min-width: 0; min-height: 0; }
         <p class="hint" id="ed-hint" hidden></p>
       </div>
       <div class="ed-pal">
-        <div class="seg" id="ed-filter"><button data-v="all" aria-pressed="true">All</button><button data-v="center">Center</button><button data-v="side">Side</button><button data-v="filler">Small</button><button data-v="basic">Basic</button></div>
+        <div class="seg" id="ed-filter"><button data-v="all" aria-pressed="true">All</button><button data-v="center">Center</button><button data-v="side">Side</button><button data-v="filler">Small</button><button data-v="letters">Letters</button><button data-v="basic">Basic</button></div>
         <div class="pgrid" id="ed-pgrid"></div>
       </div>
     </div>
@@ -2045,9 +2045,21 @@ function basicMotifs() {
   });
   return E.basic;
 }
+// Your extracted alphabet as placeable shapes (unit space, like any motif).
+function letterMotifs() {
+  if (E.letters && E.lettersSrc === LIB.alphabet) return E.letters;
+  E.lettersSrc = LIB.alphabet;
+  E.letters = [...ALPHA_CHARS].filter(ch => LIB.alphabet[ch]).map(ch => {
+    const g = LIB.alphabet[ch], bb = bboxOf(g.polys), cx = (bb.x0 + bb.x1) / 2, cy = (bb.y0 + bb.y1) / 2, s = 2 / Math.max(bb.w, bb.h);
+    const f = p => p.map(([x, y]) => [(x - cx) * s, (y - cy) * s]);
+    return { id: 'L_' + ch, ch, polys: g.polys.map(f), keeps: g.keeps.map(f), aspect: bb.w / bb.h, nativeR: 3, role: 'letter', files: ['Letter ' + ch] };
+  });
+  return E.letters;
+}
 function paletteList() {
   const lib = LIB.motifs.filter(m => m.role !== 'off');
   if (E.filter === 'basic') return basicMotifs();
+  if (E.filter === 'letters') return letterMotifs();
   if (E.filter === 'all') return [...lib, ...basicMotifs()];
   return lib.filter(m => E.filter === 'filler' ? m.role === 'filler' || m.role === 'divider' : m.role === E.filter);
 }
@@ -2059,6 +2071,10 @@ function renderPalette() {
     b.title = m.files ? m.files.join(', ') : 'Basic shape';
     b.innerHTML = motifSVG(m);
     b.addEventListener('click', () => {
+      // Letters go on unmirrored (a mirrored letter reads backwards); switching back restores Mirror.
+      if (m.role === 'letter' && !E.lastPickLetter) $('ed-mirror').checked = false;
+      if (m.role !== 'letter' && E.lastPickLetter) $('ed-mirror').checked = true;
+      E.lastPickLetter = m.role === 'letter';
       E.motif = m; E.tool = 'add'; setSeg('ed-tool', 'add'); $('ed-stage').dataset.tool = 'add';
       E.sel = -1; E.items = []; $('ed-size').value = Math.min(6, Math.max(1.2, m.nativeR)); $('ed-rot').value = 0;
       [...g.children].forEach(c => c.setAttribute('aria-pressed', c === b ? 'true' : 'false'));
@@ -2066,9 +2082,11 @@ function renderPalette() {
     });
     g.appendChild(b);
   }
-  if (!g.children.length) g.innerHTML = '<p class="hint">No motifs here. Import your SVGs in the library, or pick Basic.</p>';
+  if (!g.children.length) g.innerHTML = E.filter === 'letters'
+    ? '<p class="hint">No letters yet. Import your keychain SVGs (or a library file) so your alphabet can be read from them.</p>'
+    : '<p class="hint">No motifs here. Import your SVGs in the library, or pick Basic.</p>';
 }
-const motifById = id => (E.des && E.des.custom || []).find(m => m.id === id) || LIB.motifs.find(m => m.id === id) || basicMotifs().find(m => m.id === id);
+const motifById = id => (E.des && E.des.custom || []).find(m => m.id === id) || LIB.motifs.find(m => m.id === id) || basicMotifs().find(m => m.id === id) || letterMotifs().find(m => m.id === id);
 const holePoly = k => { const [si, hi] = k.split(':').map(Number); return E.des.base[si].holes[hi]; };
 // Turn existing cut-outs into a reusable motif for this design (centre, size, polygons in unit space).
 function makeCustom(keys) {
@@ -2348,7 +2366,13 @@ stage.addEventListener('pointerdown', e => {
   }
   if (E.tool === 'add' && E.motif) {
     pushUndo();
-    E.des.placed.push({ mid: E.motif.id, x: snapAxis(p.x), y: p.y, R: +$('ed-size').value, rot: +$('ed-rot').value, mirror: $('ed-mirror').checked });
+    let mid = E.motif.id;
+    if (E.motif.role === 'letter') {
+      // Keep this letter's own copy with the design, so it stays the same if the alphabet changes later.
+      const c = { ...E.motif, id: 'c' + Math.random().toString(36).slice(2, 8), role: 'custom' };
+      (E.des.custom || (E.des.custom = [])).push(c); mid = c.id;
+    }
+    E.des.placed.push({ mid, x: snapAxis(p.x), y: p.y, R: +$('ed-size').value, rot: +$('ed-rot').value, mirror: $('ed-mirror').checked });
     // Placed and done: nothing stays selected, so turning/resizing next affects the next one to place.
     E.sel = -1; E.items = []; checkWarnings(); renderDyn(); edHint(); return;
   }
