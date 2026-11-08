@@ -272,7 +272,7 @@ function switchView(view) {
   document.querySelector('main').classList.toggle('main-tool', isPapel);
   if (isPapel) {
     const frame = document.getElementById('papel-frame');
-    if (!frame.getAttribute('src')) frame.setAttribute('src', 'papel-picado/index.html?v=2026-11-08a');
+    if (!frame.getAttribute('src')) frame.setAttribute('src', 'papel-picado/index.html?v=2026-11-08b');
     document.querySelector('.display-toggle').style.display = 'none';
     document.getElementById('stats-row').classList.add('hidden');
     document.getElementById('table-view').classList.add('hidden');
