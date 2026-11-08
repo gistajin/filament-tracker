@@ -261,6 +261,19 @@ main {
   margin: 0 auto;
 }
 
+/* Papel picado studio tab: the embedded page fills everything under the header */
+main.main-tool {
+  max-width: none;
+  padding: 0;
+}
+
+#papel-frame {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 56px);
+  border: 0;
+}
+
 /* ---- Toolbar ---- */
 .toolbar {
   display: flex;
