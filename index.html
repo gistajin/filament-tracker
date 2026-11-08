@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>3D YEEHAW HQ</title>
-  <link rel="stylesheet" href="css/style.css?v=2026-10-27a">
+  <link rel="stylesheet" href="css/style.css?v=2026-11-08a">
   <script>
     (function() {
       try {
@@ -42,6 +42,7 @@
       <button class="view-btn" data-view="fair" onclick="switchView('fair')">Models</button>
       <button class="view-btn" data-view="events" onclick="switchView('events')">Events</button>
       <button class="view-btn" data-view="estimator" onclick="switchView('estimator')">Estimator</button>
+      <button class="view-btn" data-view="papel" onclick="switchView('papel')">Papel Picado</button>
     </div>
     <div class="header-right">
       <div class="display-toggle">
@@ -62,7 +63,7 @@
   </header>
 
   <main>
-    <div class="toolbar">
+    <div class="toolbar" id="main-toolbar">
       <input type="text" id="search" placeholder="Search color, type, location..." oninput="renderAll()">
       <select id="filter-type" onchange="renderAll()"></select>
       <select id="filter-brand" onchange="renderAll()">
@@ -198,6 +199,10 @@
         </div>
 
       </div>
+    </div>
+
+    <div id="papel-view" class="hidden">
+      <iframe id="papel-frame" title="Papel Picado Keychain Studio" allow="clipboard-read; clipboard-write"></iframe>
     </div>
 
   </main>
@@ -442,8 +447,8 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
-<script src="js/config.js?v=2026-10-27a"></script>
-<script src="js/sheets.js?v=2026-10-27a"></script>
-<script src="js/app.js?v=2026-10-27a"></script>
+<script src="js/config.js?v=2026-11-08a"></script>
+<script src="js/sheets.js?v=2026-11-08a"></script>
+<script src="js/app.js?v=2026-11-08a"></script>
 </body>
 </html>
